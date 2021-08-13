@@ -1,0 +1,20 @@
+//==============================================================================
+// Welcome to shader authoring in Spark AR Studio!
+//==============================================================================
+
+#import <gradients>
+#import <sdf>
+
+// @param[default=#FFFFFFFF] color
+// @param[default=vec2(0.5, 0.5)] center
+// @param[default=0.5] radius
+// @param[default=1.0] aspectRatio
+// @return color
+vec4 main(vec4 color, vec2 center, float radius) {
+  vec2 uv = fragment(std::getVertexTexCoord());
+  auto sdf = std::sdfPolygon(center, radius, 3.0);
+  float dist = sdf(uv);
+  float edge = fwidth(dist);
+  float alpha = smoothstep(-edge, +edge, dist);
+  return mix(color, color.rgb0, alpha);
+}

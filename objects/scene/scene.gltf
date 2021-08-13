@@ -1,0 +1,222 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 114,
+      "max": [
+        0.009999999776482582,
+        0.0005000000237487257,
+        0.009999998845160007
+      ],
+      "min": [
+        -0.009999998845160007,
+        -0.0007880328339524567,
+        -0.009999998845160007
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1368,
+      "componentType": 5126,
+      "count": 114,
+      "max": [
+        0.9238795638084412,
+        1.0,
+        0.9238795638084412
+      ],
+      "min": [
+        -0.9238795638084412,
+        -1.0,
+        -0.9238795638084412
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 114,
+      "max": [
+        0.65625,
+        1.0
+      ],
+      "min": [
+        0.34375,
+        0.0
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 432,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "BlaizeJ (https://sketchfab.com/BlaizeJ)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/octagon-plate-ee413ab16b724c3eac5db0f767500873",
+      "title": "Octagon Plate"
+    },
+    "generator": "Sketchfab-10.78.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 1728,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 912,
+      "byteOffset": 1728,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2736,
+      "byteOffset": 2640,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 5376,
+      "uri": "scene.bin"
+    }
+  ],
+  "materials": [
+    {
+      "name": "lambert1",
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.8
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Object_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.0,
+        1.608122622957729e-16,
+        1.6081226229577294e-16,
+        0.0,
+        1.6081226229577292e-16,
+        3.828568672208042e-16,
+        -1.0,
+        0.0,
+        -1.6081226229577292e-16,
+        1.0,
+        3.828568672208042e-16,
+        0.0,
+        7.809006844612983e-19,
+        8.673617379884037e-19,
+        -7.809023388225232e-19,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "name": "root"
+    },
+    {
+      "children": [
+        3
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.220446049250313e-16,
+        1.0,
+        0.0,
+        0.0,
+        -1.0,
+        2.220446049250313e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "GLTF_SceneRootNode"
+    },
+    {
+      "children": [
+        4
+      ],
+      "name": "RootNode_0"
+    },
+    {
+      "children": [
+        5
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.004999999888241291,
+        0.0,
+        1.0
+      ],
+      "name": "pCylinder1_1"
+    },
+    {
+      "mesh": 0,
+      "name": "Object_5"
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}
