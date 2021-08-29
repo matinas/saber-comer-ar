@@ -1,3 +1,8 @@
+// This script plays a configured sequence of animations in order as soon as the tracker detects the target (requires
+// a startPlaying patch editor output parameter that sets to true as soon as the target is detected)
+// The mapping of names for the animation assets to play is configured in the clipsMapping array
+// The current sequence of animations to be played is configured in the animationSequence array
+
 const Scene = require('Scene');
 const Animation = require('Animation');
 const Reactive = require('Reactive');
@@ -73,6 +78,7 @@ async function OnAnimationFinished()
       // if it's the last animation in the sequence we start to wrap up the experience
       if (currentClipIndex == animationSequence.length - 1)
       {
+        // let patch editor know when the complete sequence is reproduced (requires animationSequenceCompleted input parameter to be added in the editor!)
         await Patches.inputs.setBoolean('animationSequenceCompleted', true);
       }
     }
