@@ -78,5 +78,3 @@ async function OnAnimationFinished()
     }
   }
 }
-
-main();
