@@ -7,10 +7,12 @@ const T = require('Time');
 const TG = require('TouchGestures');
 export const Diagnostics = require('Diagnostics');
 
+const DOOR_OPENING_MAX_ROTATION = -170
 const DOOR_OPENING_DURATION = 5000;
 const PI = 3.1416;
+const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, WorkingOut: 3, WorkoutCompleted: 4, DoorsClosed: 5 };
 
-var buttonPressedUp = R.val(false);
+var state = R.val(STATE.NotStarted);
 
 Promise.all(
   [
@@ -23,6 +25,7 @@ Promise.all(
     S.root.findFirst('topDoor'),
     S.root.findFirst('leftTopDoor'),
     S.root.findFirst('Bouton_2'),
+    P.outputs.getBoolean("doorsOpened"),
   ]
 ).then(main).catch((error) =>
   {
@@ -48,33 +51,45 @@ async function main(assets) { // Enables async/await in JS [part 1]
   const topDoor = assets[6];
   const leftTopDoor = assets[7];
   const button = assets[8];
+  const doorsOpened = assets[9];
 
   Diagnostics.log("All assets loaded");
 
   const doorOpenDriver = A.timeDriver({durationMilliseconds: DOOR_OPENING_DURATION, loopCount : 1});
-  const doorOpenSampler = A.samplers.easeOutCubic(0, -170);
+  const doorOpenSampler = A.samplers.easeOutCubic(0, DOOR_OPENING_MAX_ROTATION);
   const doorOpenSignal = RadToDeg(A.animate(doorOpenDriver, doorOpenSampler));
 
-  Diagnostics.watch("Door open signal: ", doorOpenSignal);
-
   leftDoor.transform.rotationY = doorOpenSignal;
-  leftBottomDoor.transform.rotationY = doorOpenSignal;
-  bottomDoor.transform.rotationY = doorOpenSignal;
-  rightBottomDoor.transform.rotationY = doorOpenSignal;
-  rightDoor.transform.rotationY = doorOpenSignal;
-  rightTopDoor.transform.rotationY = doorOpenSignal;
-  rightTopDoor.transform.rotationY = doorOpenSignal;
-  topDoor.transform.rotationY = doorOpenSignal;
-  leftTopDoor.transform.rotationY = doorOpenSignal;
+  leftBottomDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.1), DOOR_OPENING_MAX_ROTATION, 0);
+  bottomDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.2), DOOR_OPENING_MAX_ROTATION, 0);
+  rightBottomDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.3), DOOR_OPENING_MAX_ROTATION, 0);
+  rightDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.4), DOOR_OPENING_MAX_ROTATION, 0);
+  rightTopDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.5), DOOR_OPENING_MAX_ROTATION, 0);
+  topDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.7), DOOR_OPENING_MAX_ROTATION, 0);
+  leftTopDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.8), DOOR_OPENING_MAX_ROTATION, 0);
 
   TG.onTap(button).subscribe(() => 
   {
-    buttonPressedUp = R.val(true);
-    P.inputs.setBoolean("buttonPressedUp", buttonPressedUp);
-    
+    state = R.val(STATE.OpeningDoors);
+    P.inputs.setScalar("state", state);
+
     doorOpenDriver.start();
   });
 
-  Diagnostics.watch("buttonPressedUp", buttonPressedUp);
+  doorsOpened.monitor().subscribe(() =>
+  {
+    Diagnostics.log("Ready to start!");
+
+    state = R.val(STATE.DoorsOpened);
+    P.inputs.setScalar("state", state);
+  });
+
+  outputToPatch();
 
 }; // Enables async/await in JS [part 2]
+
+function outputToPatch()
+{
+  P.inputs.setScalar("state", state);
+  Diagnostics.watch("State: ", state);
+}
