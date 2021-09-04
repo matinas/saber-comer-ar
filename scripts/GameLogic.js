@@ -24,7 +24,7 @@ Promise.all(
     S.root.findFirst('rightTopDoor'),
     S.root.findFirst('topDoor'),
     S.root.findFirst('leftTopDoor'),
-    S.root.findFirst('Bouton_2'),
+    S.root.findFirst('buttonCap'),
     P.outputs.getBoolean("doorsOpened"),
   ]
 ).then(main).catch((error) =>
