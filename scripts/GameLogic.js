@@ -1,4 +1,3 @@
-// How to load in modules
 const S = require('Scene');
 const P = require('Patches'); 
 const R = require('Reactive'); 
