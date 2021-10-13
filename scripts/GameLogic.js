@@ -1,3 +1,5 @@
+import { start } from 'repl';
+
 const S = require('Scene');
 const P = require('Patches'); 
 const R = require('Reactive'); 
@@ -25,21 +27,25 @@ const clipsMapping = {
 };
 
 const burpeesAnimationSequence = [
-  "BurpeeStart", "Burpee", "Burpee", "BurpeeEnd",
+  "BurpeeStart", "Burpee", "BurpeeEnd"
 ]
 
 const pushupsAnimationSequence = [
-  "IdleToPushup", "Pushup", "Pushup", "PushupToIdle",
+  "IdleToPushup", "Pushup", "PushupToIdle",
 ]
 
 const situpsAnimationSequence = [
-  "IdleToSitup", "Situp", "Situp", "Situp", "SitupToIdle",
+  "IdleToSitup", "Situp", "SitupToIdle",
 ]
+
+var availableWorkouts = [ "Burpees", "Pushups", "Situps" ];
 
 let currentAnimationSequence;
 let currentClipIndex = 0;
 let playbackController;
 let isPlaying;
+
+let arrowPlaceholders, arrowButtons;
 
 var state = R.val(STATE.NotStarted);
 
@@ -60,7 +66,11 @@ Promise.all(
     S.root.findFirst('nodes_5_situps'),
     P.outputs.getBoolean("buttonsReady"),
     S.root.findFirst('Miguelito'),
-    A.playbackControllers.findFirst('animationPlaybackController0')
+    A.playbackControllers.findFirst('animationPlaybackController0'),
+    S.root.findFirst('arrowPlaceholderBurpees'),
+    S.root.findFirst('arrowPlaceholderPushups'),
+    S.root.findFirst('arrowPlaceholderSitups'),
+    S.root.findFirst('JumpArrow - Button Console')
   ]
 ).then(main).catch((error) =>
   {
@@ -93,6 +103,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
   const buttonsReady = assets[13];
   const model = assets[14];
   playbackController = assets[15];
+  arrowPlaceholders = {
+    "Burpees" : assets[16],
+    "Pushups" : assets[17],
+    "Situps" : assets[18]
+  }
+  arrowButtons = assets[19];
 
   Diagnostics.log("All assets loaded");
 
@@ -114,6 +130,14 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   isPlaying.monitor().subscribe(OnAnimationFinished);
 
+  doorsOpened.monitor().subscribe(() =>
+  {
+    Diagnostics.log("Ready to start!");
+
+    state = R.val(STATE.DoorsOpened);
+    P.inputs.setScalar("state", state);
+  });
+
   TG.onTap(mainButton).subscribe(() => 
   {
     state = R.val(STATE.OpeningDoors);
@@ -122,18 +146,29 @@ async function main(assets) { // Enables async/await in JS [part 1]
     doorOpenDriver.start();
   });
 
+  buttonsReady.monitor().subscribe(() =>
+  {
+    Diagnostics.log("Ready to select buttons");
+
+    UpdateButtonConsoleArrow();
+
+    state = R.val(STATE.ButtonSelect);
+    P.inputs.setScalar("state", state);
+  });
+
   TG.onTap(burpeesButton).subscribe(async () => 
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
       Diagnostics.log("Burpees button pressed!");
 
-      currentClipIndex = 0;
-      currentAnimationSequence = burpeesAnimationSequence;
-      AdvanceAnimationPlayback();
-
       state = R.val(STATE.WorkingOut_Burpees);
       P.inputs.setScalar("state", state);
+
+      StartWorkout(burpeesAnimationSequence);
+
+      arrowButtons.hidden = R.val(true);
+      delete availableWorkouts[0]; // delete the first index (Burpees) in the available workouts array. Note that this lefts the index 0 element in the array but with undefined value
     }
     else
     {
@@ -147,12 +182,13 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Pushups button pressed!");
 
-      currentClipIndex = 0;
-      currentAnimationSequence = pushupsAnimationSequence;
-      AdvanceAnimationPlayback();
-
       state = R.val(STATE.WorkingOut_Pushups);
       P.inputs.setScalar("state", state);
+
+      StartWorkout(pushupsAnimationSequence);
+
+      arrowButtons.hidden = R.val(true);
+      delete availableWorkouts[1];
     }
     else
     {
@@ -166,33 +202,18 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Situps button pressed!");
       
-      currentClipIndex = 0;
-      currentAnimationSequence = situpsAnimationSequence;
-      AdvanceAnimationPlayback();
-
       state = R.val(STATE.WorkingOut_Situps);
       P.inputs.setScalar("state", state);
+
+      StartWorkout(situpsAnimationSequence);
+
+      arrowButtons.hidden = R.val(true);
+      delete availableWorkouts[2];
     }
     else
     {
       Diagnostics.log("ERROR: Button console still not ready!");
     }
-  });
-
-  buttonsReady.monitor().subscribe(() =>
-  {
-    Diagnostics.log("Ready to select buttons");
-
-    state = R.val(STATE.ButtonSelect);
-    P.inputs.setScalar("state", state);
-  });
-
-  doorsOpened.monitor().subscribe(() =>
-  {
-    Diagnostics.log("Ready to start!");
-
-    state = R.val(STATE.DoorsOpened);
-    P.inputs.setScalar("state", state);
   });
 
   outputToPatch();
@@ -205,39 +226,90 @@ function outputToPatch()
   Diagnostics.watch("State: ", state);
 }
 
-async function AdvanceAnimationPlayback()
+async function StartWorkout(animationSequence)
 {
-  var animation = currentAnimationSequence[currentClipIndex];
-  Diagnostics.log("Animation: " + animation);
-  var clipName = clipsMapping[animation];
-  Diagnostics.log("ClipName: " + clipName);
-  var clip = await A.animationClips.findFirst(clipName);
-  Diagnostics.log("Clip: " + clip);
+  currentClipIndex = 0;
+  currentAnimationSequence = animationSequence;
+  
+  const clip = await GetCurrentClip();
 
   playbackController.looping = R.val(false);
-  playbackController.playing = R.val(true);
   playbackController.setAnimationClip(clip);
+  playbackController.reset();
 }
 
 async function OnAnimationFinished()
 {
-  Diagnostics.log("Animation finished!");
-
-  currentClipIndex++;
-  if (currentClipIndex < currentAnimationSequence.length)
+  if (!isPlaying.pinLastValue())
   {
-    AdvanceAnimationPlayback();
-  }
-  else
-  {
-    Diagnostics.log("Workout completed, select another one");
+    currentClipIndex++;
 
-    var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
-    playbackController.looping = R.val(true);
-    playbackController.playing = R.val(true);
-    playbackController.setAnimationClip(clip);
+    if (currentClipIndex < currentAnimationSequence.length)
+    {
+      const clip = await GetCurrentClip();
+  
+      playbackController.setAnimationClip(clip);
+      playbackController.reset();
 
-    state = R.val(STATE.ButtonSelect);
-    P.inputs.setScalar("state", state);
+      playbackController.playing = R.val(true);
+    }
+    else
+    {
+      Diagnostics.log("Workout completed, select another one");
+
+      var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
+
+      playbackController.setAnimationClip(clip);
+      playbackController.reset();
+
+      playbackController.looping = R.val(true);
+      playbackController.playing = R.val(true);
+
+      if (GetFirstAvailableIndex() != null) // there are still available workouts to do
+      {
+        UpdateButtonConsoleArrow();
+
+        state = R.val(STATE.ButtonSelect);
+        P.inputs.setScalar("state", state);
+      }
+      else
+      {
+        // no more workouts to do...
+
+        Diagnostics.log("Congratulations! All workouts completed");
+
+        state = R.val(STATE.AllWorkoutsCompleted);
+        P.inputs.setScalar("state", state);
+      }
+    }
   }
+}
+
+async function GetCurrentClip()
+{
+  var animation = currentAnimationSequence[currentClipIndex];
+  Diagnostics.log("Animation: " + animation);
+  var clipName = clipsMapping[animation];
+  var clip = await A.animationClips.findFirst(clipName);
+
+  return clip;
+}
+
+function UpdateButtonConsoleArrow()
+{
+  const arrowPlaceholder = arrowPlaceholders[availableWorkouts[GetFirstAvailableIndex()]];
+  arrowButtons.transform.position = arrowPlaceholder.transform.position;
+  arrowButtons.transform.rotation = arrowPlaceholder.transform.rotation;
+
+  arrowButtons.hidden = R.val(false);
+}
+
+function GetFirstAvailableIndex()
+{
+  for(var i = 0; i < availableWorkouts.length; i++){ 
+    if (availableWorkouts[i] != undefined) { 
+        return i;
+    }
+  }
+  return null;
 }
