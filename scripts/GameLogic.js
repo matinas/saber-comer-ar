@@ -4,6 +4,7 @@ const S = require('Scene');
 const P = require('Patches'); 
 const R = require('Reactive'); 
 const A = require('Animation');
+const Au = require('Audio');
 const T = require('Time');
 const TG = require('TouchGestures');
 export const Diagnostics = require('Diagnostics');
@@ -45,6 +46,8 @@ let currentClipIndex = 0;
 let playbackController;
 let isPlaying;
 
+let audioButtonsController;
+
 let arrowPlaceholders, arrowButtons;
 
 var state = R.val(STATE.NotStarted);
@@ -66,11 +69,12 @@ Promise.all(
     S.root.findFirst('nodes_5_situps'),
     P.outputs.getBoolean("buttonsReady"),
     S.root.findFirst('Miguelito'),
-    A.playbackControllers.findFirst('animationPlaybackController0'),
+    A.playbackControllers.findFirst('animationPlaybackController'),
     S.root.findFirst('arrowPlaceholderBurpees'),
     S.root.findFirst('arrowPlaceholderPushups'),
     S.root.findFirst('arrowPlaceholderSitups'),
-    S.root.findFirst('JumpArrow - Button Console')
+    S.root.findFirst('JumpArrow - Button Console'),
+    Au.getAudioPlaybackController('audioPlaybackControllerButtons')
   ]
 ).then(main).catch((error) =>
   {
@@ -109,6 +113,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     "Situps" : assets[18]
   }
   arrowButtons = assets[19];
+  audioButtonsController = assets[20];
 
   Diagnostics.log("All assets loaded");
 
@@ -129,6 +134,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   isPlaying = playbackController.playing;
 
   isPlaying.monitor().subscribe(OnAnimationFinished);
+
+  audioButtonsController.setPlaying(false);
 
   doorsOpened.monitor().subscribe(() =>
   {
@@ -162,6 +169,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Burpees button pressed!");
 
+      audioButtonsController.reset();
+      audioButtonsController.setPlaying(true);
+
       state = R.val(STATE.WorkingOut_Burpees);
       P.inputs.setScalar("state", state);
 
@@ -181,6 +191,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
       Diagnostics.log("Pushups button pressed!");
+
+      audioButtonsController.reset();
+      audioButtonsController.setPlaying(true);
 
       state = R.val(STATE.WorkingOut_Pushups);
       P.inputs.setScalar("state", state);
@@ -202,6 +215,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Situps button pressed!");
       
+      audioButtonsController.reset();
+      audioButtonsController.setPlaying(true);
+
       state = R.val(STATE.WorkingOut_Situps);
       P.inputs.setScalar("state", state);
 
@@ -256,6 +272,8 @@ async function OnAnimationFinished()
     else
     {
       Diagnostics.log("Workout completed, select another one");
+
+      audioButtonsController.setPlaying(false);
 
       var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
 
