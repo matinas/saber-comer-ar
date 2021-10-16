@@ -12,7 +12,7 @@ export const Diagnostics = require('Diagnostics');
 const DOOR_OPENING_MAX_ROTATION = -170
 const DOOR_OPENING_DURATION = 5000;
 const PI = 3.1416;
-const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut_Burpees: 4, WorkingOut_Pushups: 5, WorkingOut_Situps: 6, WorkoutCompleted: 7, AllWorkoutsCompleted : 8, DoorsClosed: 9 };
+const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WorkoutCompleted: 5, AllWorkoutsCompleted : 6, DoorsClosed: 7 };
 
 const clipsMapping = {
   "Idle": "mixamo.com",
@@ -47,6 +47,7 @@ let playbackController;
 let isPlaying;
 
 let audioButtonsController;
+let buttonInstructionsText;
 
 let arrowPlaceholders, arrowButtons;
 
@@ -74,7 +75,8 @@ Promise.all(
     S.root.findFirst('arrowPlaceholderPushups'),
     S.root.findFirst('arrowPlaceholderSitups'),
     S.root.findFirst('JumpArrow - Button Console'),
-    Au.getAudioPlaybackController('audioPlaybackControllerButtons')
+    Au.getAudioPlaybackController('audioPlaybackControllerButtons'),
+    S.root.findFirst('instructionButtonPressText')
   ]
 ).then(main).catch((error) =>
   {
@@ -114,6 +116,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   }
   arrowButtons = assets[19];
   audioButtonsController = assets[20];
+  buttonInstructionsText = assets[21];
 
   Diagnostics.log("All assets loaded");
 
@@ -157,10 +160,14 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     Diagnostics.log("Ready to select buttons");
 
+    buttonInstructionsText.hidden = R.val(false);
+
     UpdateButtonConsoleArrow();
 
     state = R.val(STATE.ButtonSelect);
     P.inputs.setScalar("state", state);
+
+    P.inputs.setBoolean("hideMessage", true);
   });
 
   TG.onTap(burpeesButton).subscribe(async () => 
@@ -172,7 +179,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
-      state = R.val(STATE.WorkingOut_Burpees);
+      buttonInstructionsText.hidden = R.val(true);
+
+      state = R.val(STATE.WorkingOut);
       P.inputs.setScalar("state", state);
 
       StartWorkout(burpeesAnimationSequence);
@@ -195,7 +204,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
-      state = R.val(STATE.WorkingOut_Pushups);
+      buttonInstructionsText.hidden = R.val(true);
+
+      state = R.val(STATE.WorkingOut);
       P.inputs.setScalar("state", state);
 
       StartWorkout(pushupsAnimationSequence);
@@ -218,7 +229,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
-      state = R.val(STATE.WorkingOut_Situps);
+      buttonInstructionsText.hidden = R.val(true);
+
+      state = R.val(STATE.WorkingOut);
       P.inputs.setScalar("state", state);
 
       StartWorkout(situpsAnimationSequence);
@@ -268,6 +281,7 @@ async function OnAnimationFinished()
       playbackController.reset();
 
       audioButtonsController.setPlaying(false);
+      P.inputs.setBoolean("hideMessage", false); // avoids showing message multiple time on patch editor, as after first workout rep message should be already hidden
 
       playbackController.playing = R.val(true);
     }
@@ -286,6 +300,8 @@ async function OnAnimationFinished()
       if (GetFirstAvailableIndex() != null) // there are still available workouts to do
       {
         UpdateButtonConsoleArrow();
+
+        buttonInstructionsText.hidden = R.val(false);
 
         state = R.val(STATE.ButtonSelect);
         P.inputs.setScalar("state", state);
