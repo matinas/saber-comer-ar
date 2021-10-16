@@ -246,7 +246,7 @@ async function StartWorkout(animationSequence)
 {
   currentClipIndex = 0;
   currentAnimationSequence = animationSequence;
-  
+
   const clip = await GetCurrentClip();
 
   playbackController.looping = R.val(false);
@@ -267,13 +267,13 @@ async function OnAnimationFinished()
       playbackController.setAnimationClip(clip);
       playbackController.reset();
 
+      audioButtonsController.setPlaying(false);
+
       playbackController.playing = R.val(true);
     }
     else
     {
       Diagnostics.log("Workout completed, select another one");
-
-      audioButtonsController.setPlaying(false);
 
       var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
 
