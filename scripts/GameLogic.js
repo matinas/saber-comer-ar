@@ -6,6 +6,7 @@ const R = require('Reactive');
 const A = require('Animation');
 const Au = require('Audio');
 const T = require('Time');
+const M = require('Materials');
 const TG = require('TouchGestures');
 export const Diagnostics = require('Diagnostics');
 
@@ -50,6 +51,10 @@ let audioButtonsController;
 let buttonInstructionsText;
 
 let arrowPlaceholders, arrowButtons;
+let buttonCaps;
+let buttonMat, buttonMatDisabled;
+
+let lastWorkoutSelected;
 
 var state = R.val(STATE.NotStarted);
 
@@ -76,7 +81,9 @@ Promise.all(
     S.root.findFirst('arrowPlaceholderSitups'),
     S.root.findFirst('JumpArrow - Button Console'),
     Au.getAudioPlaybackController('audioPlaybackControllerButtons'),
-    S.root.findFirst('instructionButtonPressText')
+    S.root.findFirst('instructionButtonPressText'),
+    M.findFirst('buttonCircle'),
+    M.findFirst('buttonCircleDisabled'),
   ]
 ).then(main).catch((error) =>
   {
@@ -117,7 +124,15 @@ async function main(assets) { // Enables async/await in JS [part 1]
   arrowButtons = assets[19];
   audioButtonsController = assets[20];
   buttonInstructionsText = assets[21];
+  buttonMat = assets[22];
+  buttonMatDisabled = assets[23];
 
+  buttonCaps = {
+    "Burpees" : burpeesButton,
+    "Pushups" : pushupsButton,
+    "Situps" : situpsButton
+  }
+  
   Diagnostics.log("All assets loaded");
 
   const doorOpenDriver = A.timeDriver({durationMilliseconds: DOOR_OPENING_DURATION, loopCount : 1});
@@ -176,6 +191,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Burpees button pressed!");
 
+      lastWorkoutSelected = availableWorkouts[0];
+
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
@@ -188,6 +205,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       arrowButtons.hidden = R.val(true);
       delete availableWorkouts[0]; // delete the first index (Burpees) in the available workouts array. Note that this lefts the index 0 element in the array but with undefined value
+
+      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
     }
     else
     {
@@ -201,6 +220,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Pushups button pressed!");
 
+      lastWorkoutSelected = availableWorkouts[1];
+
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
@@ -213,6 +234,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       arrowButtons.hidden = R.val(true);
       delete availableWorkouts[1];
+
+      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
     }
     else
     {
@@ -226,6 +249,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Situps button pressed!");
       
+      lastWorkoutSelected = availableWorkouts[2];
+
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
@@ -238,6 +263,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       arrowButtons.hidden = R.val(true);
       delete availableWorkouts[2];
+
+      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
     }
     else
     {
@@ -297,9 +324,12 @@ async function OnAnimationFinished()
       playbackController.looping = R.val(true);
       playbackController.playing = R.val(true);
 
+      SwitchButton(lastWorkoutSelected, false);
+
       if (GetFirstAvailableIndex() != null) // there are still available workouts to do
       {
         UpdateButtonConsoleArrow();
+        // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons when the current workout is finished
 
         buttonInstructionsText.hidden = R.val(false);
 
@@ -329,6 +359,22 @@ async function GetCurrentClip()
   return clip;
 }
 
+function SwitchAvailableButtons(enable)
+{
+  for(var i = 0; i < availableWorkouts.length; i++) {
+    var workout = availableWorkouts[i];
+    if (workout != undefined) { 
+      SwitchButton(workout, enable);
+    }
+  }
+}
+
+function SwitchButton(button, enable)
+{
+  if (enable) { buttonCaps[button].material = buttonMat; }
+  else { buttonCaps[button].material = buttonMatDisabled; }
+}
+
 function UpdateButtonConsoleArrow()
 {
   const arrowPlaceholder = arrowPlaceholders[availableWorkouts[GetFirstAvailableIndex()]];
@@ -340,7 +386,7 @@ function UpdateButtonConsoleArrow()
 
 function GetFirstAvailableIndex()
 {
-  for(var i = 0; i < availableWorkouts.length; i++){ 
+  for(var i = 0; i < availableWorkouts.length; i++) { 
     if (availableWorkouts[i] != undefined) { 
         return i;
     }
