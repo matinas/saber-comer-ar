@@ -56,6 +56,8 @@ let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
 
+let delayTimer, timeoutTimer;
+
 var state = R.val(STATE.NotStarted);
 
 Promise.all(
@@ -201,7 +203,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
       state = R.val(STATE.WorkingOut);
       P.inputs.setScalar("state", state);
 
-      StartWorkout(burpeesAnimationSequence);
+      SetupWorkoutStart(burpeesAnimationSequence);
 
       arrowButtons.hidden = R.val(true);
       delete availableWorkouts[0]; // delete the first index (Burpees) in the available workouts array. Note that this lefts the index 0 element in the array but with undefined value
@@ -230,7 +232,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
       state = R.val(STATE.WorkingOut);
       P.inputs.setScalar("state", state);
 
-      StartWorkout(pushupsAnimationSequence);
+      SetupWorkoutStart(pushupsAnimationSequence);
 
       arrowButtons.hidden = R.val(true);
       delete availableWorkouts[1];
@@ -259,7 +261,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
       state = R.val(STATE.WorkingOut);
       P.inputs.setScalar("state", state);
 
-      StartWorkout(situpsAnimationSequence);
+      SetupWorkoutStart(situpsAnimationSequence);
 
       arrowButtons.hidden = R.val(true);
       delete availableWorkouts[2];
@@ -282,10 +284,18 @@ function outputToPatch()
   Diagnostics.watch("State: ", state);
 }
 
-async function StartWorkout(animationSequence)
+async function SetupWorkoutStart(animationSequence)
+{
+  currentAnimationSequence = animationSequence;
+
+  // start the workout with a little delay so it starts after reproducing the platform's transition animation
+  delayTimer = T.setInterval(StartWorkout, 1000);
+  timeoutTimer = T.setTimeout(stopIntervalTimer, 1500); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
+}
+
+async function StartWorkout()
 {
   currentClipIndex = 0;
-  currentAnimationSequence = animationSequence;
 
   const clip = await GetCurrentClip();
 
@@ -392,4 +402,8 @@ function GetFirstAvailableIndex()
     }
   }
   return null;
+}
+
+function stopIntervalTimer() {
+  T.clearInterval(delayTimer);
 }
