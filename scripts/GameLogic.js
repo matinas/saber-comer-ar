@@ -88,6 +88,7 @@ Promise.all(
     S.root.findFirst('instructionButtonPressText'),
     M.findFirst('buttonCircle'),
     M.findFirst('buttonCircleDisabled'),
+    S.root.findFirst('dummyTouchPlane'),
   ]
 ).then(main).catch((error) =>
   {
@@ -130,6 +131,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   buttonInstructionsText = assets[21];
   buttonMat = assets[22];
   buttonMatDisabled = assets[23];
+  const dummyTouchPlane = assets[24];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -269,8 +271,11 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
   });
 
-  TG.onTap(model).subscribe(() =>
+  // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
+  TG.onTap(dummyTouchPlane).subscribe(() =>
   {
+    Diagnostics.log("Model tapped!");
+
     if (state.pinLastValue() == STATE.WaitingWorkoutRep)
     {
       Diagnostics.log("Starting workout's next repetition");
