@@ -13,7 +13,7 @@ export const Diagnostics = require('Diagnostics');
 const DOOR_OPENING_MAX_ROTATION = -170
 const DOOR_OPENING_DURATION = 5000;
 const PI = 3.1416;
-const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WorkoutCompleted: 5, AllWorkoutsCompleted : 6, DoorsClosed: 7 };
+const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
 const clipsMapping = {
   "Idle": "mixamo.com",
@@ -28,16 +28,18 @@ const clipsMapping = {
   "SitupToIdle": "mixamo.com8",
 };
 
+// the amount of intermediate steps in these animation sequences ("Burpees" animation in this case) also defines
+// the maximum number of repetition that the user needs to do in order to consider the workout completed
 const burpeesAnimationSequence = [
-  "BurpeeStart", "Burpee", "BurpeeEnd"
+  "BurpeeStart", "Burpee", "Burpee", "BurpeeEnd"
 ]
 
 const pushupsAnimationSequence = [
-  "IdleToPushup", "Pushup", "PushupToIdle",
+  "IdleToPushup", "Pushup", "Pushup", "PushupToIdle",
 ]
 
 const situpsAnimationSequence = [
-  "IdleToSitup", "Situp", "SitupToIdle",
+  "IdleToSitup", "Situp", "Situp", "SitupToIdle",
 ]
 
 var availableWorkouts = [ "Burpees", "Pushups", "Situps" ];
@@ -56,9 +58,9 @@ let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
 
-let delayTimer, timeoutTimer;
+let delayTimer;
 
-var state = R.val(STATE.NotStarted);
+var state;
 
 Promise.all(
   [
@@ -150,6 +152,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   topDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.7), DOOR_OPENING_MAX_ROTATION, 0);
   leftTopDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.8), DOOR_OPENING_MAX_ROTATION, 0);
 
+  SetState(STATE.NotStarted);
+
   playbackController.looping = R.val(true);
   isPlaying = playbackController.playing;
 
@@ -161,14 +165,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     Diagnostics.log("Ready to start!");
 
-    state = R.val(STATE.DoorsOpened);
-    P.inputs.setScalar("state", state);
+    SetState(STATE.DoorsOpened);
   });
 
   TG.onTap(mainButton).subscribe(() => 
   {
-    state = R.val(STATE.OpeningDoors);
-    P.inputs.setScalar("state", state);
+    SetState(STATE.OpeningDoors);
 
     doorOpenDriver.start();
   });
@@ -181,13 +183,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
     UpdateButtonConsoleArrow();
 
-    state = R.val(STATE.ButtonSelect);
-    P.inputs.setScalar("state", state);
+    SetState(STATE.ButtonSelect);
 
     P.inputs.setBoolean("hideMessage", true);
   });
 
-  TG.onTap(burpeesButton).subscribe(async () => 
+  TG.onTap(burpeesButton).subscribe(async () =>
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
@@ -200,9 +201,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       buttonInstructionsText.hidden = R.val(true);
 
-      state = R.val(STATE.WorkingOut);
-      P.inputs.setScalar("state", state);
-
+      SetState(STATE.WorkingOut);
       SetupWorkoutStart(burpeesAnimationSequence);
 
       arrowButtons.hidden = R.val(true);
@@ -216,7 +215,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
   });
 
-  TG.onTap(pushupsButton).subscribe(async () => 
+  TG.onTap(pushupsButton).subscribe(async () =>
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
@@ -229,9 +228,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       buttonInstructionsText.hidden = R.val(true);
 
-      state = R.val(STATE.WorkingOut);
-      P.inputs.setScalar("state", state);
-
+      SetState(STATE.WorkingOut);
       SetupWorkoutStart(pushupsAnimationSequence);
 
       arrowButtons.hidden = R.val(true);
@@ -245,7 +242,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
   });
 
-  TG.onTap(situpsButton).subscribe(() => 
+  TG.onTap(situpsButton).subscribe(() =>
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
@@ -258,9 +255,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       buttonInstructionsText.hidden = R.val(true);
 
-      state = R.val(STATE.WorkingOut);
-      P.inputs.setScalar("state", state);
-
+      SetState(STATE.WorkingOut);
       SetupWorkoutStart(situpsAnimationSequence);
 
       arrowButtons.hidden = R.val(true);
@@ -271,6 +266,21 @@ async function main(assets) { // Enables async/await in JS [part 1]
     else
     {
       Diagnostics.log("ERROR: Button console still not ready!");
+    }
+  });
+
+  TG.onTap(model).subscribe(() =>
+  {
+    if (state.pinLastValue() == STATE.WaitingWorkoutRep)
+    {
+      Diagnostics.log("Starting workout's next repetition");
+
+      SetState(STATE.WorkingOut);
+      StartWorkoutRepetition();
+    }
+    else
+    {
+      Diagnostics.log("Please select a workout before trying to make a repetition");
     }
   });
 
@@ -290,18 +300,56 @@ async function SetupWorkoutStart(animationSequence)
 
   // start the workout with a little delay so it starts after reproducing the platform's transition animation
   delayTimer = T.setInterval(StartWorkout, 1000);
-  timeoutTimer = T.setTimeout(stopIntervalTimer, 1500); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
+  const timeoutTimer = T.setTimeout(stopIntervalTimer, 1500); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
 }
 
 async function StartWorkout()
 {
   currentClipIndex = 0;
+  PlayAnimation(null, true, false);
+}
 
-  const clip = await GetCurrentClip();
+function StartWorkoutRepetition()
+{
+  if (currentClipIndex < currentAnimationSequence.length)
+  {
+    PlayAnimation(null, true, false);
 
-  playbackController.looping = R.val(false);
-  playbackController.setAnimationClip(clip);
-  playbackController.reset();
+    audioButtonsController.setPlaying(false);
+    P.inputs.setBoolean("hideMessage", false); // avoids showing message multiple times on patch editor, as after first workout rep message should be already hidden
+  }
+}
+
+async function PlayAnimation(clip, play, loop)
+{
+  var currentClip;
+  
+  if (clip) currentClip = clip;
+  else currentClip = await GetCurrentClip();
+
+  if (currentClip)
+  {
+    playbackController.setAnimationClip(currentClip);
+    playbackController.reset();
+
+    playbackController.looping = R.val(loop);
+    playbackController.playing = R.val(play);
+  }
+}
+
+async function GetCurrentClip()
+{
+  var clip = null;
+
+  if (currentClipIndex < currentAnimationSequence.length)
+  {
+    var animation = currentAnimationSequence[currentClipIndex];
+    Diagnostics.log("Animation: " + animation);
+    var clipName = clipsMapping[animation];
+    clip = await A.animationClips.findFirst(clipName);
+
+    return clip;
+  }
 }
 
 async function OnAnimationFinished()
@@ -309,64 +357,50 @@ async function OnAnimationFinished()
   if (!isPlaying.pinLastValue())
   {
     currentClipIndex++;
+    Diagnostics.log("CurrentClipIndex: " + currentClipIndex + ". CurrentAnimationSequence length: " + currentAnimationSequence.length);
 
-    if (currentClipIndex < currentAnimationSequence.length)
+    if (currentClipIndex >= currentAnimationSequence.length) // played all animation sequence, set animation back to idle
     {
-      const clip = await GetCurrentClip();
-  
-      playbackController.setAnimationClip(clip);
-      playbackController.reset();
+        Diagnostics.log("Workout completed, select another one");
 
-      audioButtonsController.setPlaying(false);
-      P.inputs.setBoolean("hideMessage", false); // avoids showing message multiple time on patch editor, as after first workout rep message should be already hidden
+        var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
 
-      playbackController.playing = R.val(true);
+        PlayAnimation(clip, true, true);
+        SwitchButton(lastWorkoutSelected, false);
+
+        if (GetFirstAvailableIndex() != null) // there are still available workouts to do
+        {
+          UpdateButtonConsoleArrow();
+          // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons only once the current workout is finished
+
+          buttonInstructionsText.hidden = R.val(false);
+
+          SetState(STATE.ButtonSelect);
+        }
+        else // no more workouts to do
+        {
+          Diagnostics.log("Congratulations! All workouts completed");
+
+          SetState(STATE.AllWorkoutsCompleted);
+        }
     }
     else
     {
-      Diagnostics.log("Workout completed, select another one");
+      Diagnostics.log("Ready to do another repetion");
 
-      var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
-
-      playbackController.setAnimationClip(clip);
-      playbackController.reset();
-
-      playbackController.looping = R.val(true);
-      playbackController.playing = R.val(true);
-
-      SwitchButton(lastWorkoutSelected, false);
-
-      if (GetFirstAvailableIndex() != null) // there are still available workouts to do
-      {
-        UpdateButtonConsoleArrow();
-        // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons when the current workout is finished
-
-        buttonInstructionsText.hidden = R.val(false);
-
-        state = R.val(STATE.ButtonSelect);
-        P.inputs.setScalar("state", state);
-      }
-      else
-      {
-        // no more workouts to do...
-
-        Diagnostics.log("Congratulations! All workouts completed");
-
-        state = R.val(STATE.AllWorkoutsCompleted);
-        P.inputs.setScalar("state", state);
-      }
+      SetState(STATE.WaitingWorkoutRep);
     }
+  }
+  else
+  {
+    Diagnostics.log("Repetition completed, but still reproducing animation");
   }
 }
 
-async function GetCurrentClip()
+function SetState(stateToSet)
 {
-  var animation = currentAnimationSequence[currentClipIndex];
-  Diagnostics.log("Animation: " + animation);
-  var clipName = clipsMapping[animation];
-  var clip = await A.animationClips.findFirst(clipName);
-
-  return clip;
+  state = R.val(stateToSet);
+  P.inputs.setScalar("state", state);
 }
 
 function SwitchAvailableButtons(enable)
@@ -404,6 +438,7 @@ function GetFirstAvailableIndex()
   return null;
 }
 
-function stopIntervalTimer() {
+function stopIntervalTimer()
+{
   T.clearInterval(delayTimer);
 }
