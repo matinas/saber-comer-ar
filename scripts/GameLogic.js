@@ -50,14 +50,13 @@ let playbackController;
 let isPlaying;
 
 let audioButtonsController;
-let buttonInstructionsText;
+let buttonInstructionsText, workoutInstructionsText_1, workoutInstructionsText_2;
 
-let arrowPlaceholders, arrowButtons;
+let arrowPlaceholders, arrowButtons, workoutArrowPlaceholders;
 let buttonCaps;
 let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
-
 let delayTimer;
 
 var state;
@@ -89,6 +88,9 @@ Promise.all(
     M.findFirst('buttonCircle'),
     M.findFirst('buttonCircleDisabled'),
     S.root.findFirst('dummyTouchPlane'),
+    S.root.findFirst('instructionWorkoutTapText_1'),
+    S.root.findFirst('instructionWorkoutTapText_2'),
+    S.root.findFirst('arrowWorkoutsPlaceholder'),
   ]
 ).then(main).catch((error) =>
   {
@@ -132,6 +134,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
   buttonMat = assets[22];
   buttonMatDisabled = assets[23];
   const dummyTouchPlane = assets[24];
+  workoutInstructionsText_1 = assets[25];
+  workoutInstructionsText_2 = assets[26];
+  workoutArrowPlaceholders = assets[27];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -182,6 +187,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     Diagnostics.log("Ready to select buttons");
 
     buttonInstructionsText.hidden = R.val(false);
+    ShowWorkoutInstruction(false);
 
     UpdateButtonConsoleArrow();
 
@@ -280,6 +286,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Starting workout's next repetition");
 
+      UpdateWorkoutsArrow(false);
+      ShowWorkoutInstruction(false);
+
       SetState(STATE.WorkingOut);
       StartWorkoutRepetition();
     }
@@ -288,6 +297,27 @@ async function main(assets) { // Enables async/await in JS [part 1]
       Diagnostics.log("Please select a workout before trying to make a repetition");
     }
   });
+
+  // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
+  // TG.onTap(model).subscribe(() =>
+  // {
+  //   Diagnostics.log("Model tapped!");
+
+  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
+  //   {
+  //     Diagnostics.log("Starting workout's next repetition");
+
+  //     UpdateWorkoutsArrow(false);
+  //     ShowWorkoutInstruction(false);
+
+  //     SetState(STATE.WorkingOut);
+  //     StartWorkoutRepetition();
+  //   }
+  //   else
+  //   {
+  //     Diagnostics.log("Please select a workout before trying to make a repetition");
+  //   }
+  // });
 
   outputToPatch();
 
@@ -393,6 +423,12 @@ async function OnAnimationFinished()
     {
       Diagnostics.log("Ready to do another repetion");
 
+      if (currentClipIndex == 1) // show workout instructions only before starting the actual workout
+      {
+        UpdateWorkoutsArrow(true);
+        ShowWorkoutInstruction(true);
+      }
+
       SetState(STATE.WaitingWorkoutRep);
     }
   }
@@ -433,6 +469,14 @@ function UpdateButtonConsoleArrow()
   arrowButtons.hidden = R.val(false);
 }
 
+function UpdateWorkoutsArrow(show)
+{
+  arrowButtons.transform.position = workoutArrowPlaceholders.transform.position;
+  arrowButtons.transform.rotation = workoutArrowPlaceholders.transform.rotation;
+  
+  arrowButtons.hidden = R.val(!show);
+}
+
 function GetFirstAvailableIndex()
 {
   for(var i = 0; i < availableWorkouts.length; i++) { 
@@ -446,4 +490,10 @@ function GetFirstAvailableIndex()
 function stopIntervalTimer()
 {
   T.clearInterval(delayTimer);
+}
+
+function ShowWorkoutInstruction(show)
+{
+  workoutInstructionsText_1.hidden = R.val(!show);
+  workoutInstructionsText_2.hidden = R.val(!show);
 }
