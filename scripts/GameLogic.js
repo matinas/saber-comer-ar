@@ -30,6 +30,7 @@ const clipsMapping = {
 
 // the amount of intermediate steps in these animation sequences ("Burpees" animation in this case) also defines
 // the maximum number of repetition that the user needs to do in order to consider the workout completed
+// take into account that for all the animations we are using the wrap-up "End" animation already does a repetition
 const burpeesAnimationSequence = [
   "BurpeeStart", "Burpee", "Burpee", "BurpeeEnd"
 ]
@@ -52,14 +53,14 @@ let isPlaying;
 let audioButtonsController;
 let buttonInstructionsText, workoutInstructionsText_1, workoutInstructionsText_2;
 
-let arrowPlaceholders, arrowButtons, workoutArrowPlaceholders;
+let arrowHint, workoutButtonsPlaceholders, workoutArrowPlaceholder, mainButtonArrowPlaceholder;
 let buttonCaps;
 let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
 let delayTimer;
 
-var state;
+let state;
 
 Promise.all(
   [
@@ -82,7 +83,7 @@ Promise.all(
     S.root.findFirst('arrowPlaceholderBurpees'),
     S.root.findFirst('arrowPlaceholderPushups'),
     S.root.findFirst('arrowPlaceholderSitups'),
-    S.root.findFirst('JumpArrow - Button Console'),
+    S.root.findFirst('ArrowHint'),
     Au.getAudioPlaybackController('audioPlaybackControllerButtons'),
     S.root.findFirst('instructionButtonPressText'),
     M.findFirst('buttonCircle'),
@@ -91,6 +92,7 @@ Promise.all(
     S.root.findFirst('instructionWorkoutTapText_1'),
     S.root.findFirst('instructionWorkoutTapText_2'),
     S.root.findFirst('arrowWorkoutsPlaceholder'),
+    S.root.findFirst('arrowMainButtonPlaceholder'),
   ]
 ).then(main).catch((error) =>
   {
@@ -123,12 +125,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
   const buttonsReady = assets[13];
   const model = assets[14];
   playbackController = assets[15];
-  arrowPlaceholders = {
+  workoutButtonsPlaceholders = {
     "Burpees" : assets[16],
     "Pushups" : assets[17],
     "Situps" : assets[18]
   }
-  arrowButtons = assets[19];
+  arrowHint = assets[19];
   audioButtonsController = assets[20];
   buttonInstructionsText = assets[21];
   buttonMat = assets[22];
@@ -136,7 +138,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   const dummyTouchPlane = assets[24];
   workoutInstructionsText_1 = assets[25];
   workoutInstructionsText_2 = assets[26];
-  workoutArrowPlaceholders = assets[27];
+  workoutArrowPlaceholder = assets[27];
+  mainButtonArrowPlaceholder = assets[28];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -145,6 +148,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   }
   
   Diagnostics.log("All assets loaded");
+
+  SetState(STATE.NotStarted);
 
   const doorOpenDriver = A.timeDriver({durationMilliseconds: DOOR_OPENING_DURATION, loopCount : 1});
   const doorOpenSampler = A.samplers.easeOutCubic(0, DOOR_OPENING_MAX_ROTATION);
@@ -159,14 +164,14 @@ async function main(assets) { // Enables async/await in JS [part 1]
   topDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.7), DOOR_OPENING_MAX_ROTATION, 0);
   leftTopDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.8), DOOR_OPENING_MAX_ROTATION, 0);
 
-  SetState(STATE.NotStarted);
-
   playbackController.looping = R.val(true);
   isPlaying = playbackController.playing;
 
   isPlaying.monitor().subscribe(OnAnimationFinished);
 
   audioButtonsController.setPlaying(false);
+
+  UpdateArrowHint(true);
 
   doorsOpened.monitor().subscribe(() =>
   {
@@ -179,6 +184,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     SetState(STATE.OpeningDoors);
 
+    UpdateArrowHint(false);
+
     doorOpenDriver.start();
   });
 
@@ -186,12 +193,11 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     Diagnostics.log("Ready to select buttons");
 
+    SetState(STATE.ButtonSelect);
+
     buttonInstructionsText.hidden = R.val(false);
     ShowWorkoutInstruction(false);
-
-    UpdateButtonConsoleArrow();
-
-    SetState(STATE.ButtonSelect);
+    UpdateArrowHint(true);
 
     P.inputs.setBoolean("hideMessage", true);
   });
@@ -202,17 +208,18 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Burpees button pressed!");
 
+      SetState(STATE.WorkingOut);
+
       lastWorkoutSelected = availableWorkouts[0];
 
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
       buttonInstructionsText.hidden = R.val(true);
-
-      SetState(STATE.WorkingOut);
+      
       SetupWorkoutStart(burpeesAnimationSequence);
 
-      arrowButtons.hidden = R.val(true);
+      arrowHint.hidden = R.val(true);
       delete availableWorkouts[0]; // delete the first index (Burpees) in the available workouts array. Note that this lefts the index 0 element in the array but with undefined value
 
       // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
@@ -229,17 +236,18 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Pushups button pressed!");
 
+      SetState(STATE.WorkingOut);
+
       lastWorkoutSelected = availableWorkouts[1];
 
       audioButtonsController.reset();
       audioButtonsController.setPlaying(true);
 
       buttonInstructionsText.hidden = R.val(true);
-
-      SetState(STATE.WorkingOut);
+      
       SetupWorkoutStart(pushupsAnimationSequence);
 
-      arrowButtons.hidden = R.val(true);
+      arrowHint.hidden = R.val(true);
       delete availableWorkouts[1];
 
       // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
@@ -256,6 +264,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Situps button pressed!");
       
+      SetState(STATE.WorkingOut);
+
       lastWorkoutSelected = availableWorkouts[2];
 
       audioButtonsController.reset();
@@ -263,10 +273,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       buttonInstructionsText.hidden = R.val(true);
 
-      SetState(STATE.WorkingOut);
       SetupWorkoutStart(situpsAnimationSequence);
 
-      arrowButtons.hidden = R.val(true);
+      arrowHint.hidden = R.val(true);
       delete availableWorkouts[2];
 
       // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
@@ -278,7 +287,28 @@ async function main(assets) { // Enables async/await in JS [part 1]
   });
 
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
-  TG.onTap(dummyTouchPlane).subscribe(() =>
+  // TG.onTap(dummyTouchPlane).subscribe(() =>
+  // {
+  //   Diagnostics.log("Model tapped!");
+
+  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
+  //   {
+  //     Diagnostics.log("Starting workout's next repetition");
+
+  //     SetState(STATE.WorkingOut);
+
+  //     ShowWorkoutInstruction(false);
+  //     UpdateArrowHint(false);
+  //     StartWorkoutRepetition();
+  //   }
+  //   else
+  //   {
+  //     Diagnostics.log("Please select a workout before trying to make a repetition");
+  //   }
+  // });
+
+  // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
+  TG.onTap(model).subscribe(() =>
   {
     Diagnostics.log("Model tapped!");
 
@@ -286,7 +316,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     {
       Diagnostics.log("Starting workout's next repetition");
 
-      UpdateWorkoutsArrow(false);
+      UpdateArrowHint(false);
       ShowWorkoutInstruction(false);
 
       SetState(STATE.WorkingOut);
@@ -297,27 +327,6 @@ async function main(assets) { // Enables async/await in JS [part 1]
       Diagnostics.log("Please select a workout before trying to make a repetition");
     }
   });
-
-  // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
-  // TG.onTap(model).subscribe(() =>
-  // {
-  //   Diagnostics.log("Model tapped!");
-
-  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
-  //   {
-  //     Diagnostics.log("Starting workout's next repetition");
-
-  //     UpdateWorkoutsArrow(false);
-  //     ShowWorkoutInstruction(false);
-
-  //     SetState(STATE.WorkingOut);
-  //     StartWorkoutRepetition();
-  //   }
-  //   else
-  //   {
-  //     Diagnostics.log("Please select a workout before trying to make a repetition");
-  //   }
-  // });
 
   outputToPatch();
 
@@ -405,12 +414,12 @@ async function OnAnimationFinished()
 
         if (GetFirstAvailableIndex() != null) // there are still available workouts to do
         {
-          UpdateButtonConsoleArrow();
-          // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons only once the current workout is finished
+          SetState(STATE.ButtonSelect);
 
           buttonInstructionsText.hidden = R.val(false);
 
-          SetState(STATE.ButtonSelect);
+          UpdateArrowHint(true);
+          // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons only once the current workout is finished
         }
         else // no more workouts to do
         {
@@ -423,13 +432,13 @@ async function OnAnimationFinished()
     {
       Diagnostics.log("Ready to do another repetion");
 
+      SetState(STATE.WaitingWorkoutRep);
+
       if (currentClipIndex == 1) // show workout instructions only before starting the actual workout
       {
-        UpdateWorkoutsArrow(true);
+        UpdateArrowHint(true);
         ShowWorkoutInstruction(true);
       }
-
-      SetState(STATE.WaitingWorkoutRep);
     }
   }
   else
@@ -460,21 +469,44 @@ function SwitchButton(button, enable)
   else { buttonCaps[button].material = buttonMatDisabled; }
 }
 
-function UpdateButtonConsoleArrow()
+// this function takes care of the positioning of the only instance of the arrow asset based on the proper placeholder for the current state
+// take into account that this function should be called AFTER updating the state with SetState()
+function UpdateArrowHint(show)
 {
-  const arrowPlaceholder = arrowPlaceholders[availableWorkouts[GetFirstAvailableIndex()]];
-  arrowButtons.transform.position = arrowPlaceholder.transform.position;
-  arrowButtons.transform.rotation = arrowPlaceholder.transform.rotation;
+  if (!show)
+  {
+    arrowHint.hidden = R.val(true);
+    return;
+  }
 
-  arrowButtons.hidden = R.val(false);
-}
+  var arrowPlaceholder = null;
 
-function UpdateWorkoutsArrow(show)
-{
-  arrowButtons.transform.position = workoutArrowPlaceholders.transform.position;
-  arrowButtons.transform.rotation = workoutArrowPlaceholders.transform.rotation;
+  switch (state.pinLastValue())
+  {
+    case STATE.NotStarted:
+    {
+      arrowPlaceholder = mainButtonArrowPlaceholder;
+      break;
+    }
+    case STATE.ButtonSelect:
+    {
+      arrowPlaceholder = workoutButtonsPlaceholders[availableWorkouts[GetFirstAvailableIndex()]];
+      break;
+    }
+    case STATE.WaitingWorkoutRep:
+    {
+      arrowPlaceholder = workoutArrowPlaceholder;
+      break;
+    }
+  }
+
+  if (arrowPlaceholder)
+  {
+    arrowHint.transform.position = arrowPlaceholder.transform.position;
+    arrowHint.transform.rotation = arrowPlaceholder.transform.rotation;
+  }
   
-  arrowButtons.hidden = R.val(!show);
+  arrowHint.hidden = R.val(!show);
 }
 
 function GetFirstAvailableIndex()
