@@ -1,3 +1,4 @@
+import BlocksModule from 'Blocks';
 import { start } from 'repl';
 
 const S = require('Scene');
@@ -13,6 +14,12 @@ export const Diagnostics = require('Diagnostics');
 const DOOR_OPENING_MAX_ROTATION = -170
 const DOOR_OPENING_DURATION = 5000;
 const PI = 3.1416;
+const AUDIO_WORKOUT_DELAY =
+{
+  "Burpees" : 1100,
+  "Pushups" : 300,
+  "Situps" : 200
+}
 const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
 const clipsMapping = {
@@ -60,6 +67,11 @@ let buttonMat, buttonMatDisabled;
 let lastWorkoutSelected;
 let delayTimer;
 
+let counterText, counterTextMat;
+let counter = 0;
+
+let audioWorkoutControllers;
+
 let state;
 
 Promise.all(
@@ -93,6 +105,17 @@ Promise.all(
     S.root.findFirst('instructionWorkoutTapText_2'),
     S.root.findFirst('arrowWorkoutsPlaceholder'),
     S.root.findFirst('arrowMainButtonPlaceholder'),
+    M.findFirst('counterTextMat'),
+    // S.root.findFirst("StretchingTextUI"), // the stretching text ended up not being used as a block but directly on the patch editor as there's no way to access block's material so to implement the fade-out effect
+    S.root.findFirst('counterText'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt1'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt2'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt3'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt4'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt5'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt6'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt7'),
+    Au.getAudioPlaybackController('audioPlaybackControllerGrunt8'),
   ]
 ).then(main).catch((error) =>
   {
@@ -140,6 +163,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
   workoutInstructionsText_2 = assets[26];
   workoutArrowPlaceholder = assets[27];
   mainButtonArrowPlaceholder = assets[28];
+  counterTextMat = assets[29];
+  counterText = assets[30];
+  audioWorkoutControllers = [ assets[31], assets[32], assets[33], assets[34], assets[35], assets[36], assets[37], assets[38] ];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -286,6 +312,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
   });
 
+  
+
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
   // TG.onTap(dummyTouchPlane).subscribe(() =>
   // {
@@ -300,11 +328,21 @@ async function main(assets) { // Enables async/await in JS [part 1]
   //     ShowWorkoutInstruction(false);
   //     UpdateArrowHint(false);
   //     StartWorkoutRepetition();
+  //     PlayCounterTextVFX();
   //   }
   //   else
   //   {
   //     Diagnostics.log("Please select a workout before trying to make a repetition");
   //   }
+  // });
+
+  outputToPatch();
+
+  // DEBUG
+  // TG.onTap().subscribe(() =>
+  // {
+  //   PlayWorkoutSFX();
+  //   //PlayCounterTextVFX();
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
@@ -321,14 +359,13 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       SetState(STATE.WorkingOut);
       StartWorkoutRepetition();
+      PlayCounterTextVFX();
     }
     else
     {
       Diagnostics.log("Please select a workout before trying to make a repetition");
     }
   });
-
-  outputToPatch();
 
 }; // Enables async/await in JS [part 2]
 
@@ -358,8 +395,8 @@ function StartWorkoutRepetition()
   if (currentClipIndex < currentAnimationSequence.length)
   {
     PlayAnimation(null, true, false);
+    PlayWorkoutSFX(AUDIO_WORKOUT_DELAY[lastWorkoutSelected]);
 
-    audioButtonsController.setPlaying(false);
     P.inputs.setBoolean("hideMessage", false); // avoids showing message multiple times on patch editor, as after first workout rep message should be already hidden
   }
 }
@@ -396,6 +433,31 @@ async function GetCurrentClip()
   }
 }
 
+function PlayWorkoutSFX(delay)
+{
+  audioButtonsController.setPlaying(false);
+
+  const index = GetRandomIndex(audioWorkoutControllers.length);
+  Diagnostics.log("Puff audio index: " + index);
+
+  delayTimer = T.setInterval(function () {
+      PlaySFX(index);
+    }, delay);
+
+  T.setTimeout(stopIntervalTimer, delay + 0.1);
+}
+
+function PlaySFX(index)
+{
+  audioWorkoutControllers[index].reset();
+  audioWorkoutControllers[index].setPlaying(true);
+}
+
+function GetRandomIndex(numItems)
+{
+  return Math.floor(Math.random() * numItems);
+}
+
 async function OnAnimationFinished()
 {
   if (!isPlaying.pinLastValue())
@@ -417,6 +479,7 @@ async function OnAnimationFinished()
           SetState(STATE.ButtonSelect);
 
           buttonInstructionsText.hidden = R.val(false);
+          counter = 0;
 
           UpdateArrowHint(true);
           // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons only once the current workout is finished
@@ -529,3 +592,39 @@ function ShowWorkoutInstruction(show)
   workoutInstructionsText_1.hidden = R.val(!show);
   workoutInstructionsText_2.hidden = R.val(!show);
 }
+
+function PlayCounterTextVFX()
+{
+  counter++;
+
+  counterText.text = R.val(counter.toString());
+  counterText.hidden = R.val(false);
+
+  // Scaling effect for counter text
+  const counterTextScaleDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+  const counterTextScaleSampler = A.samplers.linear(1, 10);
+  const counterTextScaleSignal = A.animate(counterTextScaleDriver, counterTextScaleSampler);
+
+  counterTextScaleDriver.onCompleted().subscribe(OnCounterTextVFXCompleted);
+
+  counterText.transform.scaleX = counterTextScaleSignal;
+  counterText.transform.scaleY = counterTextScaleSignal;
+
+  // Fade-out effect applied to counter text's material
+  const counterTextAlphaDriver = A.timeDriver({durationMilliseconds: 1500, loopCount : 1});
+  const counterTextAlphaSampler = A.samplers.linear(1, 0);
+  const counterTextAlphaSignal = A.animate(counterTextAlphaDriver, counterTextAlphaSampler);
+
+  counterTextMat.opacity = counterTextAlphaSignal;
+
+  counterTextScaleDriver.start();
+  counterTextAlphaDriver.start();
+
+  counterTextAlphaSignal;
+}
+
+function OnCounterTextVFXCompleted()
+{
+  counterText.hidden = R.val(true);
+}
+
