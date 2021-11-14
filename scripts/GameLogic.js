@@ -67,10 +67,10 @@ let buttonMat, buttonMatDisabled;
 let lastWorkoutSelected;
 let delayTimer;
 
-let counterText, counterTextMat;
+let counterText, counterTextMat, counterCanvas;
 let counter = 0;
 
-let audioWorkoutControllers;
+let audioWorkoutControllers, audioCounterController;
 
 let state;
 
@@ -116,6 +116,8 @@ Promise.all(
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt6'),
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt7'),
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt8'),
+    Au.getAudioPlaybackController('audioCounterController'),
+    S.root.findFirst('counterCanvas'),
   ]
 ).then(main).catch((error) =>
   {
@@ -166,6 +168,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   counterTextMat = assets[29];
   counterText = assets[30];
   audioWorkoutControllers = [ assets[31], assets[32], assets[33], assets[34], assets[35], assets[36], assets[37], assets[38] ];
+  audioCounterController = assets[39];
+  counterCanvas = assets[40];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -597,11 +601,21 @@ function PlayCounterTextVFX()
 {
   counter++;
 
+  audioCounterController.reset();
+  audioCounterController.setPlaying(true);
+
+  // move the counter forward
+  const counterCanvasPosDriver = A.timeDriver({durationMilliseconds: 800, loopCount : 1});
+  const counterCanvasPosSampler = A.samplers.linear(-0.08, -0.17);
+  const counterCanvasPosSignal = A.animate(counterCanvasPosDriver, counterCanvasPosSampler);
+
+  counterCanvas.transform.y = counterCanvasPosSignal;
+
   counterText.text = R.val(counter.toString());
   counterText.hidden = R.val(false);
 
-  // Scaling effect for counter text
-  const counterTextScaleDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+  // scale counter
+  const counterTextScaleDriver = A.timeDriver({durationMilliseconds: 800, loopCount : 1});
   const counterTextScaleSampler = A.samplers.linear(1, 10);
   const counterTextScaleSignal = A.animate(counterTextScaleDriver, counterTextScaleSampler);
 
@@ -610,13 +624,14 @@ function PlayCounterTextVFX()
   counterText.transform.scaleX = counterTextScaleSignal;
   counterText.transform.scaleY = counterTextScaleSignal;
 
-  // Fade-out effect applied to counter text's material
-  const counterTextAlphaDriver = A.timeDriver({durationMilliseconds: 1500, loopCount : 1});
+  // fade-out counter
+  const counterTextAlphaDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
   const counterTextAlphaSampler = A.samplers.linear(1, 0);
   const counterTextAlphaSignal = A.animate(counterTextAlphaDriver, counterTextAlphaSampler);
 
   counterTextMat.opacity = counterTextAlphaSignal;
 
+  counterCanvasPosDriver.start();
   counterTextScaleDriver.start();
   counterTextAlphaDriver.start();
 
