@@ -11,14 +11,16 @@ const M = require('Materials');
 const TG = require('TouchGestures');
 export const Diagnostics = require('Diagnostics');
 
+const DEBUG = false;
+
 const DOOR_OPENING_MAX_ROTATION = -170
 const DOOR_OPENING_DURATION = 5000;
 const PI = 3.1416;
 const AUDIO_WORKOUT_DELAY =
 {
   "Burpees" : 1100,
-  "Pushups" : 300,
-  "Situps" : 200
+  "Push-ups" : 300,
+  "Sit-ups" : 200
 }
 const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
@@ -50,7 +52,7 @@ const situpsAnimationSequence = [
   "IdleToSitup", "Situp", "Situp", "SitupToIdle",
 ]
 
-var availableWorkouts = [ "Burpees", "Pushups", "Situps" ];
+var availableWorkouts = [ "Burpees", "Push-ups", "Sit-ups" ];
 
 let currentAnimationSequence;
 let currentClipIndex = 0;
@@ -68,9 +70,12 @@ let lastWorkoutSelected;
 let delayTimer;
 
 let counterText, counterTextMat, counterCanvas;
-let counter = 0;
+let repCounter = 0;
+let boardWorkoutTxt, boardCounterTxt;
 
 let audioWorkoutControllers, audioCounterController;
+
+let whiteboard, chalkboard;
 
 let state;
 
@@ -118,12 +123,16 @@ Promise.all(
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt8'),
     Au.getAudioPlaybackController('audioCounterController'),
     S.root.findFirst('counterCanvas'),
+    S.root.findFirst('boardWorkoutTxt'),
+    S.root.findFirst('boardCounterTxt'),
+    S.root.findFirst('whiteboardRoot'),
+    S.root.findFirst('chalkboard'),
   ]
 ).then(main).catch((error) =>
   {
     // we are catching errors while executing main here as the catch() follows the then()
-    Diagnostics.log("Error found while fetching assets");
-    Diagnostics.log("Error message: " + error.message);
+    Log("Error found while fetching assets");
+    Log("Error message: " + error.message);
   }
 );
 
@@ -152,8 +161,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
   playbackController = assets[15];
   workoutButtonsPlaceholders = {
     "Burpees" : assets[16],
-    "Pushups" : assets[17],
-    "Situps" : assets[18]
+    "Push-ups" : assets[17],
+    "Sit-ups" : assets[18]
   }
   arrowHint = assets[19];
   audioButtonsController = assets[20];
@@ -170,14 +179,18 @@ async function main(assets) { // Enables async/await in JS [part 1]
   audioWorkoutControllers = [ assets[31], assets[32], assets[33], assets[34], assets[35], assets[36], assets[37], assets[38] ];
   audioCounterController = assets[39];
   counterCanvas = assets[40];
+  boardWorkoutTxt = assets[41];
+  boardCounterTxt = assets[42];
+  whiteboard = assets[43];
+  chalkboard = assets[44];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
-    "Pushups" : pushupsButton,
-    "Situps" : situpsButton
+    "Push-ups" : pushupsButton,
+    "Sit-ups" : situpsButton
   }
   
-  Diagnostics.log("All assets loaded");
+  Log("All assets loaded");
 
   SetState(STATE.NotStarted);
 
@@ -205,7 +218,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   doorsOpened.monitor().subscribe(() =>
   {
-    Diagnostics.log("Ready to start!");
+    Log("Ready to start!");
 
     SetState(STATE.DoorsOpened);
   });
@@ -221,7 +234,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   buttonsReady.monitor().subscribe(() =>
   {
-    Diagnostics.log("Ready to select buttons");
+    Log("Ready to select buttons");
 
     SetState(STATE.ButtonSelect);
 
@@ -236,7 +249,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
-      Diagnostics.log("Burpees button pressed!");
+      Log("Burpees button pressed!");
 
       SetState(STATE.WorkingOut);
 
@@ -256,7 +269,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
     else
     {
-      Diagnostics.log("ERROR: Button console still not ready!");
+      Log("ERROR: Button console still not ready!");
     }
   });
 
@@ -264,7 +277,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
-      Diagnostics.log("Pushups button pressed!");
+      Log("Pushups button pressed!");
 
       SetState(STATE.WorkingOut);
 
@@ -284,7 +297,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
     else
     {
-      Diagnostics.log("ERROR: Button console still not ready!");
+      Log("ERROR: Button console still not ready!");
     }
   });
 
@@ -292,7 +305,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   {
     if (state.pinLastValue() == STATE.ButtonSelect)
     {
-      Diagnostics.log("Situps button pressed!");
+      Log("Situps button pressed!");
       
       SetState(STATE.WorkingOut);
 
@@ -312,7 +325,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
     else
     {
-      Diagnostics.log("ERROR: Button console still not ready!");
+      Log("ERROR: Button console still not ready!");
     }
   });
 
@@ -321,11 +334,11 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
   // TG.onTap(dummyTouchPlane).subscribe(() =>
   // {
-  //   Diagnostics.log("Model tapped!");
+  //   Log("Model tapped!");
 
   //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
   //   {
-  //     Diagnostics.log("Starting workout's next repetition");
+  //     Log("Starting workout's next repetition");
 
   //     SetState(STATE.WorkingOut);
 
@@ -333,10 +346,11 @@ async function main(assets) { // Enables async/await in JS [part 1]
   //     UpdateArrowHint(false);
   //     StartWorkoutRepetition();
   //     PlayCounterTextVFX();
+  //     UpdateBoard();
   //   }
   //   else
   //   {
-  //     Diagnostics.log("Please select a workout before trying to make a repetition");
+  //     Log("Please select a workout before trying to make a repetition");
   //   }
   // });
 
@@ -352,22 +366,24 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
   TG.onTap(model).subscribe(() =>
   {
-    Diagnostics.log("Model tapped!");
+    Log("Model tapped!");
 
     if (state.pinLastValue() == STATE.WaitingWorkoutRep)
     {
-      Diagnostics.log("Starting workout's next repetition");
+      Log("Starting workout's next repetition");
 
       UpdateArrowHint(false);
       ShowWorkoutInstruction(false);
 
       SetState(STATE.WorkingOut);
+      
       StartWorkoutRepetition();
       PlayCounterTextVFX();
+      UpdateBoard();
     }
     else
     {
-      Diagnostics.log("Please select a workout before trying to make a repetition");
+      Log("Please select a workout before trying to make a repetition");
     }
   });
 
@@ -383,6 +399,8 @@ async function SetupWorkoutStart(animationSequence)
 {
   currentAnimationSequence = animationSequence;
 
+  UpdateBoard();
+
   // start the workout with a little delay so it starts after reproducing the platform's transition animation
   delayTimer = T.setInterval(StartWorkout, 1000);
   const timeoutTimer = T.setTimeout(stopIntervalTimer, 1500); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
@@ -390,6 +408,8 @@ async function SetupWorkoutStart(animationSequence)
 
 async function StartWorkout()
 {
+  ShowBoard(true);
+
   currentClipIndex = 0;
   PlayAnimation(null, true, false);
 }
@@ -429,7 +449,7 @@ async function GetCurrentClip()
   if (currentClipIndex < currentAnimationSequence.length)
   {
     var animation = currentAnimationSequence[currentClipIndex];
-    Diagnostics.log("Animation: " + animation);
+    Log("Animation: " + animation);
     var clipName = clipsMapping[animation];
     clip = await A.animationClips.findFirst(clipName);
 
@@ -442,7 +462,7 @@ function PlayWorkoutSFX(delay)
   audioButtonsController.setPlaying(false);
 
   const index = GetRandomIndex(audioWorkoutControllers.length);
-  Diagnostics.log("Puff audio index: " + index);
+  Log("Puff audio index: " + index);
 
   delayTimer = T.setInterval(function () {
       PlaySFX(index);
@@ -467,37 +487,40 @@ async function OnAnimationFinished()
   if (!isPlaying.pinLastValue())
   {
     currentClipIndex++;
-    Diagnostics.log("CurrentClipIndex: " + currentClipIndex + ". CurrentAnimationSequence length: " + currentAnimationSequence.length);
+    Log("CurrentClipIndex: " + currentClipIndex + ". CurrentAnimationSequence length: " + currentAnimationSequence.length);
 
     if (currentClipIndex >= currentAnimationSequence.length) // played all animation sequence, set animation back to idle
     {
-        Diagnostics.log("Workout completed, select another one");
+        Log("Workout completed, select another one");
 
         var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
 
         PlayAnimation(clip, true, true);
         SwitchButton(lastWorkoutSelected, false);
+        ShowBoard(false);
 
         if (GetFirstAvailableIndex() != null) // there are still available workouts to do
         {
           SetState(STATE.ButtonSelect);
 
           buttonInstructionsText.hidden = R.val(false);
-          counter = 0;
+          repCounter = 0;
 
           UpdateArrowHint(true);
           // SwitchAvailableButtons(true); // uncomment to enable the other not-yet-selected buttons only once the current workout is finished
         }
         else // no more workouts to do
         {
-          Diagnostics.log("Congratulations! All workouts completed");
+          Log("Congratulations! All workouts completed");
 
           SetState(STATE.AllWorkoutsCompleted);
         }
     }
     else
     {
-      Diagnostics.log("Ready to do another repetion");
+      Log("Ready to do another repetion");
+
+      repCounter++;
 
       SetState(STATE.WaitingWorkoutRep);
 
@@ -510,7 +533,7 @@ async function OnAnimationFinished()
   }
   else
   {
-    Diagnostics.log("Repetition completed, but still reproducing animation");
+    Log("Repetition completed, but still reproducing animation");
   }
 }
 
@@ -597,10 +620,58 @@ function ShowWorkoutInstruction(show)
   workoutInstructionsText_2.hidden = R.val(!show);
 }
 
+function UpdateBoard()
+{
+  boardCounterTxt.text = R.val(repCounter.toString());
+  boardWorkoutTxt.text = R.val(lastWorkoutSelected);
+
+  PlayBoardRollVFX();
+}
+
+function PlayBoardRollVFX()
+{
+  const boardRotationDriver = A.timeDriver({durationMilliseconds: 1500, loopCount : 1});
+  const boardRotationSampler = A.samplers.easeOutElastic(-15, -375);
+  const boardRotationSignal = A.animate(boardRotationDriver, boardRotationSampler);
+
+  chalkboard.transform.rotationZ = RadToDeg(boardRotationSignal);
+
+  boardRotationDriver.start();
+}
+
+function ShowBoard(show=true)
+{
+  let boardPositionDriver, boardPositionSampler, boardPositionSignal;
+
+  if (show) // make the board appear by animating it down
+  {
+    whiteboard.hidden = R.val(false);
+
+    boardPositionDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+    boardPositionSampler = A.samplers.easeOutBounce(5, 0);
+    boardPositionSignal = A.animate(boardPositionDriver, boardPositionSampler);
+  }
+  else // make the board disappear by animating it up
+  {
+    boardPositionDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+    boardPositionSampler = A.samplers.easeInOutElastic(0, 5);
+    boardPositionSignal = A.animate(boardPositionDriver, boardPositionSampler);
+
+    PlayBoardRollVFX();
+
+    boardPositionDriver.onCompleted().subscribe(() => 
+    {
+      whiteboard.hidden = R.val(true);
+    });
+  }
+
+  whiteboard.transform.z = boardPositionSignal;
+
+  boardPositionDriver.start();
+}
+
 function PlayCounterTextVFX()
 {
-  counter++;
-
   audioCounterController.reset();
   audioCounterController.setPlaying(true);
 
@@ -611,7 +682,7 @@ function PlayCounterTextVFX()
 
   counterCanvas.transform.y = counterCanvasPosSignal;
 
-  counterText.text = R.val(counter.toString());
+  counterText.text = R.val(repCounter.toString());
   counterText.hidden = R.val(false);
 
   // scale counter
@@ -643,3 +714,10 @@ function OnCounterTextVFXCompleted()
   counterText.hidden = R.val(true);
 }
 
+function Log(message)
+{
+  if (DEBUG)
+  {
+    Diagnostics.log(message);
+  }
+}
