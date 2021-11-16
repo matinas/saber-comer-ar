@@ -357,10 +357,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
   outputToPatch();
 
   // DEBUG
+
+  // Uncomment this to try stuff on screen tap on SparkAR Studio Simulator
   // TG.onTap().subscribe(() =>
   // {
-  //   PlayWorkoutSFX();
-  //   //PlayCounterTextVFX();
+  //   //PlayWorkoutSFX();
+  //   PlayCounterTextVFX();
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
@@ -623,7 +625,7 @@ function ShowWorkoutInstruction(show)
 function UpdateBoard()
 {
   boardCounterTxt.text = R.val(repCounter.toString());
-  boardWorkoutTxt.text = R.val(lastWorkoutSelected);
+  boardWorkoutTxt.text = R.val(lastWorkoutSelected.toUpperCase());
 
   PlayBoardRollVFX();
 }
