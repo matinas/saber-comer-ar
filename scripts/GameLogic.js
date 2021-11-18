@@ -1,6 +1,3 @@
-import BlocksModule from 'Blocks';
-import { start } from 'repl';
-
 const S = require('Scene');
 const P = require('Patches'); 
 const R = require('Reactive'); 
@@ -14,7 +11,11 @@ export const Diagnostics = require('Diagnostics');
 const DEBUG = false;
 
 const DOOR_OPENING_MAX_ROTATION = -170
-const DOOR_OPENING_DURATION = 5000;
+const DOOR_OPENING_DURATION = 1500;
+const DOOR_CLOSING_DURATION = 250;
+const DOOR_CLOSED_TIME = 250;
+const WORKOUT_START_DELAY = 100;
+
 const PI = 3.1416;
 const AUDIO_WORKOUT_DELAY =
 {
@@ -59,6 +60,8 @@ let currentClipIndex = 0;
 let playbackController;
 let isPlaying;
 
+let leftDoor, leftBottomDoor, bottomDoor, rightBottomDoor, rightDoor, rightTopDoor, topDoor, leftTopDoor;
+
 let audioButtonsController;
 let buttonInstructionsText, workoutInstructionsText_1, workoutInstructionsText_2;
 
@@ -67,7 +70,7 @@ let buttonCaps;
 let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
-let delayTimer;
+let workoutDelayTimer, doorDelayTimer;
 
 let counterText, counterTextMat, counterCanvas;
 let repCounter = 0;
@@ -127,6 +130,7 @@ Promise.all(
     S.root.findFirst('boardCounterTxt'),
     S.root.findFirst('whiteboardRoot'),
     S.root.findFirst('chalkboard'),
+    P.outputs.getBoolean("readyToDoorShift"),
   ]
 ).then(main).catch((error) =>
   {
@@ -143,21 +147,21 @@ function RadToDeg(radians)
 
 async function main(assets) { // Enables async/await in JS [part 1]
 
-  const leftDoor = assets[0];
-  const leftBottomDoor = assets[1];
-  const bottomDoor = assets[2];
-  const rightBottomDoor = assets[3];
-  const rightDoor = assets[4];
-  const rightTopDoor = assets[5];
-  const topDoor = assets[6];
-  const leftTopDoor = assets[7];
+  leftDoor = assets[0];
+  leftBottomDoor = assets[1];
+  bottomDoor = assets[2];
+  rightBottomDoor = assets[3];
+  rightDoor = assets[4];
+  rightTopDoor = assets[5];
+  topDoor = assets[6];
+  leftTopDoor = assets[7];
   const mainButton = assets[8];
   const doorsOpened = assets[9];
   const burpeesButton = assets[10];
   const pushupsButton = assets[11];
   const situpsButton = assets[12];
   const buttonsReady = assets[13];
-  const model = assets[14];
+  const mainModel = assets[14];
   playbackController = assets[15];
   workoutButtonsPlaceholders = {
     "Burpees" : assets[16],
@@ -183,6 +187,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   boardCounterTxt = assets[42];
   whiteboard = assets[43];
   chalkboard = assets[44];
+  const readyToDoorShift = assets[45];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -193,19 +198,6 @@ async function main(assets) { // Enables async/await in JS [part 1]
   Log("All assets loaded");
 
   SetState(STATE.NotStarted);
-
-  const doorOpenDriver = A.timeDriver({durationMilliseconds: DOOR_OPENING_DURATION, loopCount : 1});
-  const doorOpenSampler = A.samplers.easeOutCubic(0, DOOR_OPENING_MAX_ROTATION);
-  const doorOpenSignal = RadToDeg(A.animate(doorOpenDriver, doorOpenSampler));
-
-  leftDoor.transform.rotationY = doorOpenSignal;
-  leftBottomDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.1), DOOR_OPENING_MAX_ROTATION, 0);
-  bottomDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.2), DOOR_OPENING_MAX_ROTATION, 0);
-  rightBottomDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.3), DOOR_OPENING_MAX_ROTATION, 0);
-  rightDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.4), DOOR_OPENING_MAX_ROTATION, 0);
-  rightTopDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.5), DOOR_OPENING_MAX_ROTATION, 0);
-  topDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.7), DOOR_OPENING_MAX_ROTATION, 0);
-  leftTopDoor.transform.rotationY = R.clamp(R.sum(doorOpenSignal,0.8), DOOR_OPENING_MAX_ROTATION, 0);
 
   playbackController.looping = R.val(true);
   isPlaying = playbackController.playing;
@@ -223,13 +215,20 @@ async function main(assets) { // Enables async/await in JS [part 1]
     SetState(STATE.DoorsOpened);
   });
 
+  readyToDoorShift.monitor().subscribe(() =>
+  {
+    if (readyToDoorShift.pinLastValue())
+    {
+      PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
+    }
+  });
+
   TG.onTap(mainButton).subscribe(() => 
   {
     SetState(STATE.OpeningDoors);
 
     UpdateArrowHint(false);
-
-    doorOpenDriver.start();
+    PlayDoorOpenVFX();
   });
 
   buttonsReady.monitor().subscribe(() =>
@@ -329,8 +328,6 @@ async function main(assets) { // Enables async/await in JS [part 1]
     }
   });
 
-  
-
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
   // TG.onTap(dummyTouchPlane).subscribe(() =>
   // {
@@ -361,12 +358,13 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // Uncomment this to try stuff on screen tap on SparkAR Studio Simulator
   // TG.onTap().subscribe(() =>
   // {
-  //   //PlayWorkoutSFX();
-  //   PlayCounterTextVFX();
+  //   // PlayWorkoutSFX();
+  //   // PlayCounterTextVFX();
+  //   PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
-  TG.onTap(model).subscribe(() =>
+  TG.onTap(mainModel).subscribe(() =>
   {
     Log("Model tapped!");
 
@@ -397,6 +395,58 @@ function outputToPatch()
   Diagnostics.watch("State: ", state);
 }
 
+function PlayDoorOpenVFX(open = true)
+{
+  var doorRotDriver, doorRotSampler, doorRotSignal;  
+
+  if (open) // open
+  {
+    doorRotDriver = A.timeDriver({durationMilliseconds: DOOR_OPENING_DURATION, loopCount : 1});
+    doorRotSampler = A.samplers.easeOutBounce(0, DOOR_OPENING_MAX_ROTATION);
+  }
+  else // close
+  {
+    doorRotDriver = A.timeDriver({durationMilliseconds: DOOR_CLOSING_DURATION, loopCount : 1});
+    doorRotSampler = A.samplers.easeOutQuad(DOOR_OPENING_MAX_ROTATION, 0);
+  }
+
+  doorRotSignal = RadToDeg(A.animate(doorRotDriver, doorRotSampler));
+
+  leftDoor.transform.rotationY = doorRotSignal;
+  leftBottomDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.1), DOOR_OPENING_MAX_ROTATION, 0);
+  bottomDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.2), DOOR_OPENING_MAX_ROTATION, 0);
+  rightBottomDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.3), DOOR_OPENING_MAX_ROTATION, 0);
+  rightDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.4), DOOR_OPENING_MAX_ROTATION, 0);
+  rightTopDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.5), DOOR_OPENING_MAX_ROTATION, 0);
+  topDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.7), DOOR_OPENING_MAX_ROTATION, 0);
+  leftTopDoor.transform.rotationY = R.clamp(R.sum(doorRotSignal,0.8), DOOR_OPENING_MAX_ROTATION, 0);
+
+  doorRotDriver.start();
+
+  return doorRotDriver.onCompleted();
+}
+
+function PlayDoorQuickOpenCloseVFX(delay)
+{
+  var onCompletedEvt = PlayDoorOpenVFX(false);
+  
+  onCompletedEvt.subscribe(() =>
+  {
+    // add a delay between both animations so the door remains closed for a little bit before opening again
+    // the delay here should be set so to match the delay between the "platform down" animation and the "platform up" animation for the platform in the Patch Editor (1 sec right now)
+
+    doorDelayTimer = T.setInterval(function OpenDoor()
+    {
+      PlayDoorOpenVFX(true);
+    }, delay);
+    
+    // This is another way of passing the parameter value to a parameter callback function
+    // delayTimer = T.setInterval(PlayDoorOpenVFX.bind(null, { open : true }), delay);
+
+    T.setTimeout(StopDoorDelayTimer, delay+1);
+  });
+}
+
 async function SetupWorkoutStart(animationSequence)
 {
   currentAnimationSequence = animationSequence;
@@ -404,13 +454,13 @@ async function SetupWorkoutStart(animationSequence)
   UpdateBoard();
 
   // start the workout with a little delay so it starts after reproducing the platform's transition animation
-  delayTimer = T.setInterval(StartWorkout, 1000);
-  const timeoutTimer = T.setTimeout(stopIntervalTimer, 1500); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
+  workoutDelayTimer = T.setInterval(StartWorkout, WORKOUT_START_DELAY);
+  T.setTimeout(StopWorkoutDelayTimer, WORKOUT_START_DELAY+1); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
 }
 
 async function StartWorkout()
 {
-  ShowBoard(true);
+  ShowBoard();
 
   currentClipIndex = 0;
   PlayAnimation(null, true, false);
@@ -466,11 +516,11 @@ function PlayWorkoutSFX(delay)
   const index = GetRandomIndex(audioWorkoutControllers.length);
   Log("Puff audio index: " + index);
 
-  delayTimer = T.setInterval(function () {
+  workoutDelayTimer = T.setInterval(function () {
       PlaySFX(index);
     }, delay);
 
-  T.setTimeout(stopIntervalTimer, delay + 0.1);
+  T.setTimeout(StopWorkoutDelayTimer, delay + 0.1);
 }
 
 function PlaySFX(index)
@@ -611,9 +661,14 @@ function GetFirstAvailableIndex()
   return null;
 }
 
-function stopIntervalTimer()
+function StopWorkoutDelayTimer()
 {
-  T.clearInterval(delayTimer);
+  T.clearInterval(workoutDelayTimer);
+}
+
+function StopDoorDelayTimer()
+{
+  T.clearInterval(doorDelayTimer);
 }
 
 function ShowWorkoutInstruction(show)
