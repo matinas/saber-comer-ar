@@ -36,6 +36,7 @@ const clipsMapping = {
   "IdleToSitup": "mixamo.com9",
   "Situp": "mixamo.com7",
   "SitupToIdle": "mixamo.com8",
+  "Dance": "mixamo.com10",
 };
 
 // the amount of intermediate steps in these animation sequences ("Burpees" animation in this case) also defines
@@ -79,6 +80,7 @@ let boardWorkoutTxt, boardCounterTxt;
 let audioWorkoutControllers, audioCounterController;
 
 let whiteboard, chalkboard;
+let confettiBlock;
 
 let state;
 
@@ -131,6 +133,7 @@ Promise.all(
     S.root.findFirst('whiteboardRoot'),
     S.root.findFirst('chalkboard'),
     P.outputs.getBoolean("readyToDoorShift"),
+    S.root.findFirst('spritesheetConfetti'),
   ]
 ).then(main).catch((error) =>
   {
@@ -188,6 +191,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   whiteboard = assets[43];
   chalkboard = assets[44];
   const readyToDoorShift = assets[45];
+  confettiBlock = assets[46];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -356,12 +360,18 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // DEBUG
 
   // Uncomment this to try stuff on screen tap on SparkAR Studio Simulator
-  // TG.onTap().subscribe(() =>
-  // {
-  //   // PlayWorkoutSFX();
-  //   // PlayCounterTextVFX();
-  //   PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
-  // });
+  TG.onTap().subscribe(async () =>
+  {
+    // PlayWorkoutSFX();
+    // PlayCounterTextVFX();
+    // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
+
+    // Play a specific animation for the main model
+    // var clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
+    // PlayAnimation(clip, true, true);
+
+    // ShowConfetti(true);
+  });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
   TG.onTap(mainModel).subscribe(() =>
@@ -460,6 +470,7 @@ async function SetupWorkoutStart(animationSequence)
 
 async function StartWorkout()
 {
+  ShowConfetti(false); // this is required so to stop the confetti animation after a workout (otherwise it won't play next time)
   ShowBoard();
 
   currentClipIndex = 0;
@@ -514,7 +525,7 @@ function PlayWorkoutSFX(delay)
   audioButtonsController.setPlaying(false);
 
   const index = GetRandomIndex(audioWorkoutControllers.length);
-  Log("Puff audio index: " + index);
+  Log("Workout audio index: " + index);
 
   workoutDelayTimer = T.setInterval(function () {
       PlaySFX(index);
@@ -544,15 +555,19 @@ async function OnAnimationFinished()
     if (currentClipIndex >= currentAnimationSequence.length) // played all animation sequence, set animation back to idle
     {
         Log("Workout completed, select another one");
-
-        var clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
-
-        PlayAnimation(clip, true, true);
+        
         SwitchButton(lastWorkoutSelected, false);
-        ShowBoard(false);
 
+        var clip;
         if (GetFirstAvailableIndex() != null) // there are still available workouts to do
         {
+          clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
+
+          ShowConfetti(true);
+          PlayAnimation(clip, true, true);
+          SwitchButton(lastWorkoutSelected, false);
+          ShowBoard(false);
+
           SetState(STATE.ButtonSelect);
 
           buttonInstructionsText.hidden = R.val(false);
@@ -564,6 +579,9 @@ async function OnAnimationFinished()
         else // no more workouts to do
         {
           Log("Congratulations! All workouts completed");
+
+          clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
+          PlayAnimation(clip, true, true);
 
           SetState(STATE.AllWorkoutsCompleted);
         }
@@ -725,6 +743,11 @@ function ShowBoard(show=true)
   whiteboard.transform.z = boardPositionSignal;
 
   boardPositionDriver.start();
+}
+
+async function ShowConfetti(show)
+{
+  await confettiBlock.inputs.setBoolean('Play', show);
 }
 
 function PlayCounterTextVFX()
