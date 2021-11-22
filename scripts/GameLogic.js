@@ -23,6 +23,13 @@ const AUDIO_WORKOUT_DELAY =
   "Push-ups" : 300,
   "Sit-ups" : 200
 }
+const EARLY_VFX_WORKOUT_DELAY =
+{
+  "Burpees" : 1000,
+  "Push-ups" : 500,
+  "Sit-ups" : 500
+}
+
 const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
 const clipsMapping = {
@@ -37,6 +44,19 @@ const clipsMapping = {
   "Situp": "mixamo.com7",
   "SitupToIdle": "mixamo.com8",
   "Dance": "mixamo.com10",
+};
+
+const danceClipsMapping = {
+  "HouseDancing2": "mixamo.com10",
+  "WaveHipHopDance": "mixamo.com6",
+  "DancingRunningMan": "mixamo.com11",
+  "HipHopDancing": "mixamo.com12", 
+  "HouseDancing": "mixamo.com13",
+  "SillyDancing2": "mixamo.com14",
+  "SillyDancing": "mixamo.com15",
+  "SwingDancing": "mixamo.com16",
+  "Victory2": "mixamo.com17",
+  "Victory": "mixamo.com18",
 };
 
 // the amount of intermediate steps in these animation sequences ("Burpees" animation in this case) also defines
@@ -71,7 +91,7 @@ let buttonCaps;
 let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
-let workoutDelayTimer, doorDelayTimer;
+let workoutDelayTimer, doorDelayTimer, earlyVfxDelayTimer;
 
 let counterText, counterTextMat, counterCanvas;
 let repCounter = 0;
@@ -229,10 +249,13 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   TG.onTap(mainButton).subscribe(() => 
   {
-    SetState(STATE.OpeningDoors);
+    if (state.pinLastValue() == STATE.NotStarted)
+    {
+      SetState(STATE.OpeningDoors);
 
-    UpdateArrowHint(false);
-    PlayDoorOpenVFX();
+      UpdateArrowHint(false);
+      PlayDoorOpenVFX();
+    }
   });
 
   buttonsReady.monitor().subscribe(() =>
@@ -360,18 +383,22 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // DEBUG
 
   // Uncomment this to try stuff on screen tap on SparkAR Studio Simulator
-  TG.onTap().subscribe(async () =>
-  {
-    // PlayWorkoutSFX();
-    // PlayCounterTextVFX();
-    // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
+  // TG.onTap().subscribe(async () =>
+  // {
+  //   // PlayWorkoutSFX();
+  //   // PlayCounterTextVFX();
+  //   // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
 
-    // Play a specific animation for the main model
-    // var clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
-    // PlayAnimation(clip, true, true);
+  //   // Play a specific animation for the main model
+  //   // var clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
+  //   // PlayAnimation(clip, true, true);
 
-    // ShowConfetti(true);
-  });
+  //   // Cycle through a sequence of animations
+  //   var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
+  //   PlayAnimation(clip, true, true);
+
+  //   ShowConfetti(true);
+  // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
   TG.onTap(mainModel).subscribe(() =>
@@ -387,6 +414,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       SetState(STATE.WorkingOut);
       
+      // kinda hacky, but this will trigger some effects not when the whole rep's animation is completed but right in the middle of it
+      if (++repCounter >= (currentAnimationSequence.length-1))
+      {
+        PlayEarlyVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected]);
+      }
+
       StartWorkoutRepetition();
       PlayCounterTextVFX();
       UpdateBoard();
@@ -453,7 +486,10 @@ function PlayDoorQuickOpenCloseVFX(delay)
     // This is another way of passing the parameter value to a parameter callback function
     // delayTimer = T.setInterval(PlayDoorOpenVFX.bind(null, { open : true }), delay);
 
-    T.setTimeout(StopDoorDelayTimer, delay+1);
+    T.setTimeout(function StopTimerCallback()
+    {
+      StopTimer(doorDelayTimer);
+    }, delay+1);
   });
 }
 
@@ -465,7 +501,11 @@ async function SetupWorkoutStart(animationSequence)
 
   // start the workout with a little delay so it starts after reproducing the platform's transition animation
   workoutDelayTimer = T.setInterval(StartWorkout, WORKOUT_START_DELAY);
-  T.setTimeout(StopWorkoutDelayTimer, WORKOUT_START_DELAY+1); // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
+
+  T.setTimeout(function StopTimerCallback() // cancel the interval timer after doing just one call (kinda hacky but didn't work with delayed signals)
+  {
+    StopTimer(workoutDelayTimer);
+  }, WORKOUT_START_DELAY+1);
 }
 
 async function StartWorkout()
@@ -531,7 +571,10 @@ function PlayWorkoutSFX(delay)
       PlaySFX(index);
     }, delay);
 
-  T.setTimeout(StopWorkoutDelayTimer, delay + 0.1);
+  T.setTimeout(function StopTimerCallback()
+  {
+    StopTimer(workoutDelayTimer);
+  }, delay + 0.1);
 }
 
 function PlaySFX(index)
@@ -563,10 +606,12 @@ async function OnAnimationFinished()
         {
           clip = await A.animationClips.findFirst(clipsMapping["Idle"]);
 
-          ShowConfetti(true);
+          // these are shown as "early" VFX now (before completing the animation), a fixed delay after tapping for the last rep
+          // ShowConfetti(true);
+          // ShowBoard(false);
+
           PlayAnimation(clip, true, true);
           SwitchButton(lastWorkoutSelected, false);
-          ShowBoard(false);
 
           SetState(STATE.ButtonSelect);
 
@@ -580,17 +625,18 @@ async function OnAnimationFinished()
         {
           Log("Congratulations! All workouts completed");
 
-          clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
-          PlayAnimation(clip, true, true);
-
           SetState(STATE.AllWorkoutsCompleted);
+
+          // clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
+          // PlayAnimation(clip, true, true);
+
+          // DEBUG. Cycle through animation sequence
+          CycleAnimationSequence();
         }
     }
     else
     {
       Log("Ready to do another repetion");
-
-      repCounter++;
 
       SetState(STATE.WaitingWorkoutRep);
 
@@ -605,6 +651,20 @@ async function OnAnimationFinished()
   {
     Log("Repetition completed, but still reproducing animation");
   }
+}
+
+async function CycleAnimationSequence()
+{
+  currentClipIndex = 0;
+
+  TG.onTap().subscribe(async () =>
+  {
+    var keys = Object.keys(danceClipsMapping);
+    if (currentClipIndex > keys.length) currentClipIndex = 0;
+
+    var clip = await A.animationClips.findFirst(danceClipsMapping[keys[currentClipIndex++]]);
+    PlayAnimation(clip, true, true);
+  });
 }
 
 function SetState(stateToSet)
@@ -679,14 +739,9 @@ function GetFirstAvailableIndex()
   return null;
 }
 
-function StopWorkoutDelayTimer()
+function StopTimer(timer)
 {
-  T.clearInterval(workoutDelayTimer);
-}
-
-function StopDoorDelayTimer()
-{
-  T.clearInterval(doorDelayTimer);
+  T.clearInterval(timer);
 }
 
 function ShowWorkoutInstruction(show)
@@ -748,6 +803,19 @@ function ShowBoard(show=true)
 async function ShowConfetti(show)
 {
   await confettiBlock.inputs.setBoolean('Play', show);
+}
+
+function PlayEarlyVFXs(delay)
+{
+  earlyVfxDelayTimer = T.setInterval(function () {
+    ShowConfetti(true);
+    ShowBoard(false);
+  }, delay);
+
+  T.setTimeout(function StopTimerCallback()
+  {
+    StopTimer(earlyVfxDelayTimer);
+  }, delay + 0.1);
 }
 
 function PlayCounterTextVFX()
