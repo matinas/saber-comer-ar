@@ -22,13 +22,14 @@ const AUDIO_WORKOUT_DELAY =
   "Burpees" : 1100,
   "Push-ups" : 300,
   "Sit-ups" : 200
-}
+};
 const EARLY_VFX_WORKOUT_DELAY =
 {
   "Burpees" : 1000,
   "Push-ups" : 500,
   "Sit-ups" : 500
-}
+};
+const EARLY_VFX_EXPERIENCE_COMPLETED_VFX = 700;
 
 const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
@@ -47,16 +48,14 @@ const clipsMapping = {
 };
 
 const danceClipsMapping = {
+  "Victory2": "mixamo.com17",
   "HouseDancing2": "mixamo.com10",
   "WaveHipHopDance": "mixamo.com6",
   "DancingRunningMan": "mixamo.com11",
   "HipHopDancing": "mixamo.com12", 
-  "HouseDancing": "mixamo.com13",
   "SillyDancing2": "mixamo.com14",
   "SillyDancing": "mixamo.com15",
   "SwingDancing": "mixamo.com16",
-  "Victory2": "mixamo.com17",
-  "Victory": "mixamo.com18",
 };
 
 // the amount of intermediate steps in these animation sequences ("Burpees" animation in this case) also defines
@@ -74,6 +73,10 @@ const situpsAnimationSequence = [
   "IdleToSitup", "Situp", "Situp", "SitupToIdle",
 ]
 
+const cheerMessages = [
+  "¡Vamos!", "¡Eso es!", "¡Bien!", "¡Dale!", "¡Siii!"
+]
+
 var availableWorkouts = [ "Burpees", "Push-ups", "Sit-ups" ];
 
 let currentAnimationSequence;
@@ -84,7 +87,7 @@ let isPlaying;
 let leftDoor, leftBottomDoor, bottomDoor, rightBottomDoor, rightDoor, rightTopDoor, topDoor, leftTopDoor;
 
 let audioButtonsController;
-let buttonInstructionsText, workoutInstructionsText_1, workoutInstructionsText_2;
+let buttonInstructionsText, workoutInstructionsText_1, workoutInstructionsText_2, cheerMessageText;
 
 let arrowHint, workoutButtonsPlaceholders, workoutArrowPlaceholder, mainButtonArrowPlaceholder;
 let buttonCaps;
@@ -93,14 +96,14 @@ let buttonMat, buttonMatDisabled;
 let lastWorkoutSelected;
 let workoutDelayTimer, doorDelayTimer, earlyVfxDelayTimer;
 
-let counterText, counterTextMat, counterCanvas;
+let counterText, counterTextMat, counterCanvas, cheerMessageTextMat;
 let repCounter = 0;
 let boardWorkoutTxt, boardCounterTxt;
 
-let audioWorkoutControllers, audioCounterController;
+let audioWorkoutControllers, audioCounterController, endMusicController, endMusicSpeaker;
 
 let whiteboard, chalkboard;
-let confettiBlock;
+let confettiBlock, glitter;
 
 let state;
 
@@ -146,7 +149,7 @@ Promise.all(
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt6'),
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt7'),
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt8'),
-    Au.getAudioPlaybackController('audioCounterController'),
+    Au.getAudioPlaybackController('audioPlaybackCounterController'),
     S.root.findFirst('counterCanvas'),
     S.root.findFirst('boardWorkoutTxt'),
     S.root.findFirst('boardCounterTxt'),
@@ -154,6 +157,13 @@ Promise.all(
     S.root.findFirst('chalkboard'),
     P.outputs.getBoolean("readyToDoorShift"),
     S.root.findFirst('spritesheetConfetti'),
+    S.root.findFirst('glitterYellow'),
+    S.root.findFirst('glitterRed'),
+    S.root.findFirst('glitterGreen'),
+    Au.getAudioPlaybackController('audioPlaybackMusicController'),
+    S.root.findFirst('speakerMusic'),
+    S.root.findFirst('cheerMessageText'),
+    M.findFirst('cheerMessageTextMat'),
   ]
 ).then(main).catch((error) =>
   {
@@ -212,6 +222,11 @@ async function main(assets) { // Enables async/await in JS [part 1]
   chalkboard = assets[44];
   const readyToDoorShift = assets[45];
   confettiBlock = assets[46];
+  glitter = [ assets[47], assets[48], assets[49] ];
+  endMusicController = assets[50];
+  endMusicSpeaker = assets[51];
+  cheerMessageText = assets[52];
+  cheerMessageTextMat = assets[53];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -394,10 +409,14 @@ async function main(assets) { // Enables async/await in JS [part 1]
   //   // PlayAnimation(clip, true, true);
 
   //   // Cycle through a sequence of animations
-  //   var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
-  //   PlayAnimation(clip, true, true);
+  //   // var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
+  //   // PlayAnimation(clip, true, true);
 
-  //   ShowConfetti(true);
+  //   // ShowConfetti(true);
+
+  //   // PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
+
+  //   // PlayCheerMessageVFX(1000);
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
@@ -414,14 +433,15 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
       SetState(STATE.WorkingOut);
       
-      // kinda hacky, but this will trigger some effects not when the whole rep's animation is completed but right in the middle of it
+      // kinda hacky, but this will trigger some effects once the workout is completed, not when the whole rep's animation finishes but right in the middle of it
       if (++repCounter >= (currentAnimationSequence.length-1))
       {
-        PlayEarlyVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected]);
+        PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected], GetFirstAvailableIndex() == null);
       }
 
       StartWorkoutRepetition();
       PlayCounterTextVFX();
+      PlayCheerMessageVFX(200);
       UpdateBoard();
     }
     else
@@ -656,11 +676,16 @@ async function OnAnimationFinished()
 async function CycleAnimationSequence()
 {
   currentClipIndex = 0;
+  var keys = Object.keys(danceClipsMapping);
 
+  // play first animation
+  var clip = await A.animationClips.findFirst(danceClipsMapping[keys[currentClipIndex++]]);
+  PlayAnimation(clip, true, true);
+
+  // cycle through the rest of the animations on each screen tap
   TG.onTap().subscribe(async () =>
   {
-    var keys = Object.keys(danceClipsMapping);
-    if (currentClipIndex > keys.length) currentClipIndex = 0;
+    if (currentClipIndex >= keys.length) currentClipIndex = 0;
 
     var clip = await A.animationClips.findFirst(danceClipsMapping[keys[currentClipIndex++]]);
     PlayAnimation(clip, true, true);
@@ -805,17 +830,58 @@ async function ShowConfetti(show)
   await confettiBlock.inputs.setBoolean('Play', show);
 }
 
-function PlayEarlyVFXs(delay)
+function ShowGlitter()
 {
-  earlyVfxDelayTimer = T.setInterval(function () {
+  glitter.forEach(item =>
+  {
+    item.hidden = R.val(false);
+  });
+}
+
+function PlayEndMusic()
+{
+  endMusicController.setLooping(true);
+
+  const audioVolumeDriver = A.timeDriver( { durationMilliseconds : 3000, loopCount : 1});
+  const audioVolumeSampler = A.samplers.linear(0.0, 1.0);
+  const audioVolumeSignal = A.animate(audioVolumeDriver, audioVolumeSampler);
+
+  endMusicSpeaker.volume = R.val(0);
+  endMusicSpeaker.volume = audioVolumeSignal;
+
+  audioVolumeDriver.start();
+
+  endMusicController.reset();
+  endMusicController.setPlaying(true);
+}
+
+function PlayEarlyWorkoutCompletedVFXs(delay, isLastWorkout)
+{
+  earlyVfxDelayTimer = T.setInterval(function ()
+  {
     ShowConfetti(true);
     ShowBoard(false);
+
+    if (isLastWorkout)
+    {
+      const tmpTimer = T.setInterval(function ()
+      {
+        ShowGlitter();
+        PlayEndMusic();
+      }, delay+EARLY_VFX_EXPERIENCE_COMPLETED_VFX);
+
+      T.setTimeout(function StopTimerCallback()
+      {
+        StopTimer(tmpTimer);
+      }, delay+EARLY_VFX_EXPERIENCE_COMPLETED_VFX+0.1);
+    }
+
   }, delay);
 
   T.setTimeout(function StopTimerCallback()
   {
     StopTimer(earlyVfxDelayTimer);
-  }, delay + 0.1);
+  }, delay+0.1);
 }
 
 function PlayCounterTextVFX()
@@ -853,13 +919,38 @@ function PlayCounterTextVFX()
   counterCanvasPosDriver.start();
   counterTextScaleDriver.start();
   counterTextAlphaDriver.start();
-
-  counterTextAlphaSignal;
 }
 
 function OnCounterTextVFXCompleted()
 {
   counterText.hidden = R.val(true);
+}
+
+function PlayCheerMessageVFX(delay)
+{
+  const tmpTimer = T.setInterval(function ()
+  {
+    cheerMessageText.hidden = R.val(false);
+
+    const randomIndex = Math.floor(Math.random() * cheerMessages.length);
+    cheerMessageText.text = R.val(cheerMessages[randomIndex]);
+
+    // fade-out counter
+    const cheerMsgTextAlphaDriver = A.timeDriver({durationMilliseconds: 1500, loopCount : 1});
+    const cheerMsgTextAlphaSampler = A.samplers.easeInExpo(1, 0);
+    const cheerMsgTextAlphaSignal = A.animate(cheerMsgTextAlphaDriver, cheerMsgTextAlphaSampler);
+
+    cheerMessageTextMat.opacity = cheerMsgTextAlphaSignal;
+
+    cheerMsgTextAlphaDriver.start();
+  }, delay);
+
+  T.setTimeout(function StopTimerCallback()
+  {
+    StopTimer(tmpTimer);
+  }, delay+0.1);
+
+  
 }
 
 function Log(message)
