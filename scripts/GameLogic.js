@@ -74,7 +74,7 @@ const situpsAnimationSequence = [
 ]
 
 const cheerMessages = [
-  "¡Vamos!", "¡Eso es!", "¡Bien!", "¡Dale!", "¡Siii!"
+  "¡Vamos!", "¡Eso es!", "¡Bien!", "¡Una mas!", "¡Dale!", "¡Si!"
 ]
 
 var availableWorkouts = [ "Burpees", "Push-ups", "Sit-ups" ];
@@ -96,7 +96,7 @@ let buttonMat, buttonMatDisabled;
 let lastWorkoutSelected;
 let workoutDelayTimer, doorDelayTimer, earlyVfxDelayTimer;
 
-let counterText, counterTextMat, counterCanvas, cheerMessageTextMat;
+let counterText, counterTextMat, counterCanvas, cheerMessageTextMat, cheerMsgCanvas;
 let repCounter = 0;
 let boardWorkoutTxt, boardCounterTxt;
 
@@ -164,6 +164,7 @@ Promise.all(
     S.root.findFirst('speakerMusic'),
     S.root.findFirst('cheerMessageText'),
     M.findFirst('cheerMessageTextMat'),
+    S.root.findFirst('cheerMsgCanvas'),
   ]
 ).then(main).catch((error) =>
   {
@@ -227,6 +228,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   endMusicSpeaker = assets[51];
   cheerMessageText = assets[52];
   cheerMessageTextMat = assets[53];
+  cheerMsgCanvas = assets[54];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -384,7 +386,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   //     ShowWorkoutInstruction(false);
   //     UpdateArrowHint(false);
   //     StartWorkoutRepetition();
-  //     PlayCounterTextVFX();
+  //     PlayTextExpandVFX(counterCanvas, counterText, counterTextMat, 800, 1000, 0, audioCounterController);
   //     UpdateBoard();
   //   }
   //   else
@@ -401,7 +403,13 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // TG.onTap().subscribe(async () =>
   // {
   //   // PlayWorkoutSFX();
-  //   // PlayCounterTextVFX();
+  //   PlayCounterVFX();
+    
+  //   if (++repCounter > 3)
+  //   {
+  //     repCounter = 0;
+  //   }
+
   //   // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
 
   //   // Play a specific animation for the main model
@@ -416,7 +424,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   //   // PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
 
-  //   // PlayCheerMessageVFX(1000);
+  //   PlayCheerMessageVFX();
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
@@ -440,8 +448,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
       }
 
       StartWorkoutRepetition();
-      PlayCounterTextVFX();
-      PlayCheerMessageVFX(200);
+      PlayCounterVFX();
+      PlayCheerMessageVFX();
       UpdateBoard();
     }
     else
@@ -884,73 +892,81 @@ function PlayEarlyWorkoutCompletedVFXs(delay, isLastWorkout)
   }, delay+0.1);
 }
 
-function PlayCounterTextVFX()
+function PlayTextExpandVFX(canvas, text, strValue, textMat, minScale, maxScale, forwardTimeMilis, fadeoutTimeMilis, delay, audioController = null)
 {
-  audioCounterController.reset();
-  audioCounterController.setPlaying(true);
-
-  // move the counter forward
-  const counterCanvasPosDriver = A.timeDriver({durationMilliseconds: 800, loopCount : 1});
-  const counterCanvasPosSampler = A.samplers.linear(-0.08, -0.17);
-  const counterCanvasPosSignal = A.animate(counterCanvasPosDriver, counterCanvasPosSampler);
-
-  counterCanvas.transform.y = counterCanvasPosSignal;
-
-  counterText.text = R.val(repCounter.toString());
-  counterText.hidden = R.val(false);
-
-  // scale counter
-  const counterTextScaleDriver = A.timeDriver({durationMilliseconds: 800, loopCount : 1});
-  const counterTextScaleSampler = A.samplers.linear(1, 10);
-  const counterTextScaleSignal = A.animate(counterTextScaleDriver, counterTextScaleSampler);
-
-  counterTextScaleDriver.onCompleted().subscribe(OnCounterTextVFXCompleted);
-
-  counterText.transform.scaleX = counterTextScaleSignal;
-  counterText.transform.scaleY = counterTextScaleSignal;
-
-  // fade-out counter
-  const counterTextAlphaDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
-  const counterTextAlphaSampler = A.samplers.linear(1, 0);
-  const counterTextAlphaSignal = A.animate(counterTextAlphaDriver, counterTextAlphaSampler);
-
-  counterTextMat.opacity = counterTextAlphaSignal;
-
-  counterCanvasPosDriver.start();
-  counterTextScaleDriver.start();
-  counterTextAlphaDriver.start();
-}
-
-function OnCounterTextVFXCompleted()
-{
-  counterText.hidden = R.val(true);
-}
-
-function PlayCheerMessageVFX(delay)
-{
-  const tmpTimer = T.setInterval(function ()
+  function PlayVFX()
   {
-    cheerMessageText.hidden = R.val(false);
+    if (audioController != null)
+    {
+      audioController.reset();
+      audioController.setPlaying(true);
+    }
 
-    const randomIndex = Math.floor(Math.random() * cheerMessages.length);
-    cheerMessageText.text = R.val(cheerMessages[randomIndex]);
+    // move the counter forward
+    const canvasPosDriver = A.timeDriver({durationMilliseconds: forwardTimeMilis, loopCount : 1});
+    const canvasPosSampler = A.samplers.linear(-0.08, -0.17);
+    const canvasPosSignal = A.animate(canvasPosDriver, canvasPosSampler);
+
+    canvas.transform.y = canvasPosSignal;
+
+    text.text = R.val(strValue);
+    text.hidden = R.val(false);
+
+    // scale counter
+    const textScaleDriver = A.timeDriver({durationMilliseconds: forwardTimeMilis, loopCount : 1});
+    const textScaleSampler = A.samplers.linear(minScale, maxScale);
+    const textScaleSignal = A.animate(textScaleDriver, textScaleSampler);
+
+    textScaleDriver.onCompleted().subscribe(OnTextVFXCompleted.bind(null, text));
+
+    text.transform.scaleX = textScaleSignal;
+    text.transform.scaleY = textScaleSignal;
 
     // fade-out counter
-    const cheerMsgTextAlphaDriver = A.timeDriver({durationMilliseconds: 1500, loopCount : 1});
-    const cheerMsgTextAlphaSampler = A.samplers.easeInExpo(1, 0);
-    const cheerMsgTextAlphaSignal = A.animate(cheerMsgTextAlphaDriver, cheerMsgTextAlphaSampler);
+    const textAlphaDriver = A.timeDriver({durationMilliseconds: fadeoutTimeMilis, loopCount : 1});
+    const textAlphaSampler = A.samplers.linear(1, 0);
+    const textAlphaSignal = A.animate(textAlphaDriver, textAlphaSampler);
 
-    cheerMessageTextMat.opacity = cheerMsgTextAlphaSignal;
+    textMat.opacity = textAlphaSignal;
 
-    cheerMsgTextAlphaDriver.start();
-  }, delay);
+    canvasPosDriver.start();
+    textScaleDriver.start();
+    textAlphaDriver.start();
+  }
 
-  T.setTimeout(function StopTimerCallback()
+  if (delay > 0)
   {
-    StopTimer(tmpTimer);
-  }, delay+0.1);
+    const tmpTimer = T.setInterval(PlayVFX, delay);
 
-  
+    T.setTimeout(function StopTimerCallback()
+    {
+      StopTimer(tmpTimer);
+    }, delay+0.1);
+  }
+  else
+  {
+    PlayVFX();
+  }
+}
+
+function OnTextVFXCompleted(text)
+{
+  text.hidden = R.val(true);
+}
+
+function PlayCounterVFX()
+{
+  var strValue = repCounter.toString();
+
+  PlayTextExpandVFX(counterCanvas, counterText, strValue, counterTextMat, 1, 10, 800, 1000, 0, audioCounterController);
+}
+
+function PlayCheerMessageVFX()
+{
+  const randomIndex = Math.floor(Math.random() * cheerMessages.length);
+  var strValue = cheerMessages[randomIndex];
+
+  PlayTextExpandVFX(cheerMsgCanvas, cheerMessageText, strValue, cheerMessageTextMat, 1, 1.75, 800, 800, 750);
 }
 
 function Log(message)
