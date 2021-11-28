@@ -96,7 +96,7 @@ let buttonMat, buttonMatDisabled;
 let lastWorkoutSelected;
 let workoutDelayTimer, doorDelayTimer, earlyVfxDelayTimer;
 
-let counterText, counterTextMat, counterCanvas, cheerMessageTextMat, cheerMsgCanvas;
+let counterText, counterTextMat, counterCanvas, cheerMessageTextMat, cheerMsgCanvas, finalMsgText0, finalMsgText1, finalMsgText2;
 let repCounter = 0;
 let boardWorkoutTxt, boardCounterTxt;
 
@@ -165,6 +165,9 @@ Promise.all(
     S.root.findFirst('cheerMessageText'),
     M.findFirst('cheerMessageTextMat'),
     S.root.findFirst('cheerMsgCanvas'),
+    S.root.findFirst('finalMsgText0'),
+    S.root.findFirst('finalMsgText1'),
+    S.root.findFirst('finalMsgText2'),
   ]
 ).then(main).catch((error) =>
   {
@@ -229,6 +232,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
   cheerMessageText = assets[52];
   cheerMessageTextMat = assets[53];
   cheerMsgCanvas = assets[54];
+  finalMsgText0 = assets[55];
+  finalMsgText1 = assets[56];
+  finalMsgText2 = assets[57];
 
   buttonCaps = {
     "Burpees" : burpeesButton,
@@ -403,12 +409,14 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // TG.onTap().subscribe(async () =>
   // {
   //   // PlayWorkoutSFX();
-  //   PlayCounterVFX();
+  //   // PlayCounterVFX();
     
-  //   if (++repCounter > 3)
-  //   {
-  //     repCounter = 0;
-  //   }
+  //   // if (++repCounter > 3)
+  //   // {
+  //   //   repCounter = 0;
+  //   // }
+
+  //   // PlayFinalMsgTextVFX();
 
   //   // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
 
@@ -417,12 +425,12 @@ async function main(assets) { // Enables async/await in JS [part 1]
   //   // PlayAnimation(clip, true, true);
 
   //   // Cycle through a sequence of animations
-  //   // var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
-  //   // PlayAnimation(clip, true, true);
+  //   var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
+  //   PlayAnimation(clip, true, true);
 
   //   // ShowConfetti(true);
 
-  //   // PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
+  //   PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
 
   //   PlayCheerMessageVFX();
   // });
@@ -876,6 +884,7 @@ function PlayEarlyWorkoutCompletedVFXs(delay, isLastWorkout)
       {
         ShowGlitter();
         PlayEndMusic();
+        PlayFinalMsgTextVFX();
       }, delay+EARLY_VFX_EXPERIENCE_COMPLETED_VFX);
 
       T.setTimeout(function StopTimerCallback()
@@ -967,6 +976,36 @@ function PlayCheerMessageVFX()
   var strValue = cheerMessages[randomIndex];
 
   PlayTextExpandVFX(cheerMsgCanvas, cheerMessageText, strValue, cheerMessageTextMat, 1, 1.75, 800, 800, 750);
+}
+
+function PlayFinalMsgTextVFX()
+{
+  finalMsgText0.hidden = R.val(false);
+  finalMsgText1.hidden = R.val(false);
+  finalMsgText2.hidden = R.val(false);
+
+  const msgPosDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+  const msgPosSampler = A.samplers.easeInExpo(0, 375);
+  const msgPosSignal = A.animate(msgPosDriver, msgPosSampler);
+
+  msgPosDriver.onCompleted().subscribe(OnMsgVFXHidden);
+
+  finalMsgText1.transform.x = msgPosSignal;
+  finalMsgText2.transform.x = R.neg(msgPosSignal);
+
+  msgPosDriver.start();
+}
+
+function OnMsgVFXHidden()
+{
+  const msgPosDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+  const msgPosSampler = A.samplers.easeOutBounce(-375, 0);
+  const msgPosSignal = A.animate(msgPosDriver, msgPosSampler);
+
+  finalMsgText1.transform.x = msgPosSignal;
+  finalMsgText2.transform.x = R.neg(msgPosSignal);
+
+  msgPosDriver.start();
 }
 
 function Log(message)
