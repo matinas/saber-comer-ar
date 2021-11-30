@@ -34,7 +34,7 @@ const EARLY_VFX_EXPERIENCE_COMPLETED_VFX = 700;
 const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
 const clipsMapping = {
-  "Idle": "mixamo.com",
+  "Idle": "mixamo.com13",
   "IdleToPushup": "mixamo.com0",
   "Pushup": "mixamo.com1",
   "PushupToIdle": "mixamo.com2",
@@ -379,35 +379,35 @@ async function main(assets) { // Enables async/await in JS [part 1]
   });
 
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
-  TG.onTap(dummyTouchPlane).subscribe(() =>
-  {
-    Log("Model tapped!");
+  // TG.onTap(dummyTouchPlane).subscribe(() =>
+  // {
+  //   Log("Model tapped!");
 
-    if (state.pinLastValue() == STATE.WaitingWorkoutRep)
-    {
-      Log("Starting workout's next repetition");
+  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
+  //   {
+  //     Log("Starting workout's next repetition");
 
-      UpdateArrowHint(false);
-      ShowWorkoutInstruction(false);
+  //     UpdateArrowHint(false);
+  //     ShowWorkoutInstruction(false);
 
-      SetState(STATE.WorkingOut);
+  //     SetState(STATE.WorkingOut);
       
-      // kinda hacky, but this will trigger some effects once the workout is completed, not when the whole rep's animation finishes but right in the middle of it
-      if (++repCounter >= (currentAnimationSequence.length-1))
-      {
-        PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected], GetFirstAvailableIndex() == null);
-      }
+  //     // kinda hacky, but this will trigger some effects once the workout is completed, not when the whole rep's animation finishes but right in the middle of it
+  //     if (++repCounter >= (currentAnimationSequence.length-1))
+  //     {
+  //       PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected], GetFirstAvailableIndex() == null);
+  //     }
 
-      StartWorkoutRepetition();
-      PlayCounterVFX();
-      PlayCheerMessageVFX();
-      UpdateBoard();
-    }
-    else
-    {
-      Log("Please select a workout before trying to make a repetition");
-    }
-  });
+  //     StartWorkoutRepetition();
+  //     PlayCounterVFX();
+  //     PlayCheerMessageVFX();
+  //     UpdateBoard();
+  //   }
+  //   else
+  //   {
+  //     Log("Please select a workout before trying to make a repetition");
+  //   }
+  // });
 
   outputToPatch();
 
@@ -443,35 +443,35 @@ async function main(assets) { // Enables async/await in JS [part 1]
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
-  // TG.onTap(mainModel).subscribe(() =>
-  // {
-  //   Log("Model tapped!");
+  TG.onTap(mainModel).subscribe(() =>
+  {
+    Log("Model tapped!");
 
-  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
-  //   {
-  //     Log("Starting workout's next repetition");
+    if (state.pinLastValue() == STATE.WaitingWorkoutRep)
+    {
+      Log("Starting workout's next repetition");
 
-  //     UpdateArrowHint(false);
-  //     ShowWorkoutInstruction(false);
+      UpdateArrowHint(false);
+      ShowWorkoutInstruction(false);
 
-  //     SetState(STATE.WorkingOut);
+      SetState(STATE.WorkingOut);
       
-  //     // kinda hacky, but this will trigger some effects once the workout is completed, not when the whole rep's animation finishes but right in the middle of it
-  //     if (++repCounter >= (currentAnimationSequence.length-1))
-  //     {
-  //       PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected], GetFirstAvailableIndex() == null);
-  //     }
+      // kinda hacky, but this will trigger some effects once the workout is completed, not when the whole rep's animation finishes but right in the middle of it
+      if (++repCounter >= (currentAnimationSequence.length-1))
+      {
+        PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected], GetFirstAvailableIndex() == null);
+      }
 
-  //     StartWorkoutRepetition();
-  //     PlayCounterVFX();
-  //     PlayCheerMessageVFX();
-  //     UpdateBoard();
-  //   }
-  //   else
-  //   {
-  //     Log("Please select a workout before trying to make a repetition");
-  //   }
-  // });
+      StartWorkoutRepetition();
+      PlayCounterVFX();
+      PlayCheerMessageVFX();
+      UpdateBoard();
+    }
+    else
+    {
+      Log("Please select a workout before trying to make a repetition");
+    }
+  });
 
 }; // Enables async/await in JS [part 2]
 
