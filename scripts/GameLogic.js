@@ -379,64 +379,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   });
 
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
-  // TG.onTap(dummyTouchPlane).subscribe(() =>
-  // {
-  //   Log("Model tapped!");
-
-  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
-  //   {
-  //     Log("Starting workout's next repetition");
-
-  //     SetState(STATE.WorkingOut);
-
-  //     ShowWorkoutInstruction(false);
-  //     UpdateArrowHint(false);
-  //     StartWorkoutRepetition();
-  //     PlayTextExpandVFX(counterCanvas, counterText, counterTextMat, 800, 1000, 0, audioCounterController);
-  //     UpdateBoard();
-  //   }
-  //   else
-  //   {
-  //     Log("Please select a workout before trying to make a repetition");
-  //   }
-  // });
-
-  outputToPatch();
-
-  // DEBUG
-
-  // Uncomment this to try stuff on screen tap on SparkAR Studio Simulator
-  // TG.onTap().subscribe(async () =>
-  // {
-  //   // PlayWorkoutSFX();
-  //   // PlayCounterVFX();
-    
-  //   // if (++repCounter > 3)
-  //   // {
-  //   //   repCounter = 0;
-  //   // }
-
-  //   // PlayFinalMsgTextVFX();
-
-  //   // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
-
-  //   // Play a specific animation for the main model
-  //   // var clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
-  //   // PlayAnimation(clip, true, true);
-
-  //   // Cycle through a sequence of animations
-  //   var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
-  //   PlayAnimation(clip, true, true);
-
-  //   // ShowConfetti(true);
-
-  //   PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
-
-  //   PlayCheerMessageVFX();
-  // });
-
-  // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
-  TG.onTap(mainModel).subscribe(() =>
+  TG.onTap(dummyTouchPlane).subscribe(() =>
   {
     Log("Model tapped!");
 
@@ -465,6 +408,70 @@ async function main(assets) { // Enables async/await in JS [part 1]
       Log("Please select a workout before trying to make a repetition");
     }
   });
+
+  outputToPatch();
+
+  // DEBUG
+
+  // Uncomment this to try stuff on screen tap on SparkAR Studio Simulator
+  // TG.onTap().subscribe(async () =>
+  // {
+  //   // PlayWorkoutSFX();
+  //   // PlayCounterVFX();
+  //   // PlayCheerMessageVFX();
+
+  //   // if (++repCounter > 3)
+  //   // {
+  //   //   repCounter = 0;
+  //   // }
+    
+  //   // PlayFinalMsgTextVFX();
+
+  //   // PlayDoorQuickOpenCloseVFX(DOOR_CLOSED_TIME);
+
+  //   // Play a specific animation for the main model
+  //   // var clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
+  //   // PlayAnimation(clip, true, true);
+
+  //   // Cycle through a sequence of animations
+  //   // var clip = await A.animationClips.findFirst(danceClipsMapping[Object.keys(danceClipsMapping)[currentClipIndex++]]);
+  //   // PlayAnimation(clip, true, true);
+
+  //   ShowConfetti(true);
+
+  //   PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
+  // });
+
+  // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
+  // TG.onTap(mainModel).subscribe(() =>
+  // {
+  //   Log("Model tapped!");
+
+  //   if (state.pinLastValue() == STATE.WaitingWorkoutRep)
+  //   {
+  //     Log("Starting workout's next repetition");
+
+  //     UpdateArrowHint(false);
+  //     ShowWorkoutInstruction(false);
+
+  //     SetState(STATE.WorkingOut);
+      
+  //     // kinda hacky, but this will trigger some effects once the workout is completed, not when the whole rep's animation finishes but right in the middle of it
+  //     if (++repCounter >= (currentAnimationSequence.length-1))
+  //     {
+  //       PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY[lastWorkoutSelected], GetFirstAvailableIndex() == null);
+  //     }
+
+  //     StartWorkoutRepetition();
+  //     PlayCounterVFX();
+  //     PlayCheerMessageVFX();
+  //     UpdateBoard();
+  //   }
+  //   else
+  //   {
+  //     Log("Please select a workout before trying to make a repetition");
+  //   }
+  // });
 
 }; // Enables async/await in JS [part 2]
 
@@ -985,7 +992,7 @@ function PlayFinalMsgTextVFX()
   finalMsgText2.hidden = R.val(false);
 
   const msgPosDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
-  const msgPosSampler = A.samplers.easeInExpo(0, 375);
+  const msgPosSampler = A.samplers.easeInExpo(-375, 375);
   const msgPosSignal = A.animate(msgPosDriver, msgPosSampler);
 
   msgPosDriver.onCompleted().subscribe(OnMsgVFXHidden);
