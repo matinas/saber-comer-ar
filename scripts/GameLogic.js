@@ -991,16 +991,24 @@ function PlayFinalMsgTextVFX()
   finalMsgText1.hidden = R.val(false);
   finalMsgText2.hidden = R.val(false);
 
-  const msgPosDriver = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
-  const msgPosSampler = A.samplers.easeInExpo(-375, 375);
-  const msgPosSignal = A.animate(msgPosDriver, msgPosSampler);
+  const msgPosDriver0 = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+  const msgPosSampler0 = A.samplers.easeOutBounce(-375, 0);
+  const msgPosSignal0 = A.animate(msgPosDriver0, msgPosSampler0);
 
-  msgPosDriver.onCompleted().subscribe(OnMsgVFXHidden);
+  finalMsgText0.transform.x = msgPosSignal0;
+
+  msgPosDriver0.start();
+
+  const msgPosDriver1 = A.timeDriver({durationMilliseconds: 1000, loopCount : 1});
+  const msgPosSampler1 = A.samplers.easeInExpo(-375, 375);
+  const msgPosSignal = A.animate(msgPosDriver1, msgPosSampler1);
+
+  msgPosDriver1.onCompleted().subscribe(OnMsgVFXHidden);
 
   finalMsgText1.transform.x = msgPosSignal;
   finalMsgText2.transform.x = R.neg(msgPosSignal);
 
-  msgPosDriver.start();
+  msgPosDriver1.start();
 }
 
 function OnMsgVFXHidden()
