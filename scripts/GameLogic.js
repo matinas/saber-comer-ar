@@ -34,7 +34,7 @@ const EARLY_VFX_EXPERIENCE_COMPLETED_VFX = 700;
 const STATE = { NotStarted: 0, OpeningDoors: 1, DoorsOpened: 2, ButtonSelect : 3, WorkingOut: 4, WaitingWorkoutRep : 5, WorkoutCompleted: 6, AllWorkoutsCompleted : 7, DoorsClosed: 8 };
 
 const clipsMapping = {
-  "Idle": "mixamo.com13",
+  "Idle": "mixamo.com",
   "IdleToPushup": "mixamo.com0",
   "Pushup": "mixamo.com1",
   "PushupToIdle": "mixamo.com2",
@@ -439,7 +439,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   //   ShowConfetti(true);
 
-  //   PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
+  //   // PlayEarlyWorkoutCompletedVFXs(EARLY_VFX_WORKOUT_DELAY["Burpees"], true);
   // });
 
   // Uncomment this to try workout-related stuff on SparkAR Studio Simulator as due to the fixed perspective of the simulator it doesn't catch the dummy plane tap
