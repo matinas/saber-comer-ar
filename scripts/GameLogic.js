@@ -69,6 +69,12 @@ const situpsAnimationSequence = [
   "IdleToSitup", "Situp", "Situp", "SitupToIdle",
 ]
 
+const animationSequencesMapping = {
+  0: burpeesAnimationSequence,
+  1: pushupsAnimationSequence,
+  2: situpsAnimationSequence
+}
+
 const cheerMessages = [
   "¡Vamos!", "¡Eso es!", "¡Bien!", "¡Una mas!", "¡Dale!", "¡Si!"
 ]
@@ -86,7 +92,7 @@ let audioButtonsController;
 let buttonInstructionsText, workoutInstructionsText_1, workoutInstructionsText_2, cheerMessageText;
 
 let arrowHint, workoutButtonsPlaceholders, workoutArrowPlaceholder, mainButtonArrowPlaceholder;
-let buttonCaps;
+let burpeesButton, pushupsButton, situpsButton, buttonsMapping;
 let buttonMat, buttonMatDisabled;
 
 let lastWorkoutSelected;
@@ -115,9 +121,9 @@ Promise.all(
     S.root.findFirst('leftTopDoor'),
     S.root.findFirst('buttonCap'),
     P.outputs.getBoolean("doorsOpened"),
-    S.root.findFirst('nodes_5_burpees'),
-    S.root.findFirst('nodes_5_pushups'),
-    S.root.findFirst('nodes_5_situps'),
+    S.root.findFirst('burpeesButton'),
+    S.root.findFirst('pushupsButton'),
+    S.root.findFirst('situpsButton'),
     P.outputs.getBoolean("buttonsReady"),
     S.root.findFirst('Miguelito'),
     A.playbackControllers.findFirst('animationPlaybackController'),
@@ -190,9 +196,9 @@ async function main(assets) { // Enables async/await in JS [part 1]
   leftTopDoor = assets[7];
   const mainButton = assets[8];
   const doorsOpened = assets[9];
-  const burpeesButton = assets[10];
-  const pushupsButton = assets[11];
-  const situpsButton = assets[12];
+  burpeesButton = assets[10];
+  pushupsButton = assets[11];
+  situpsButton = assets[12];
   const buttonsReady = assets[13];
   const mainModel = assets[14];
   playbackController = assets[15];
@@ -232,7 +238,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
   finalMsgText1 = assets[56];
   finalMsgText2 = assets[57];
 
-  buttonCaps = {
+  buttonsMapping = {
     "Burpees" : burpeesButton,
     "Push-ups" : pushupsButton,
     "Sit-ups" : situpsButton
@@ -290,89 +296,7 @@ async function main(assets) { // Enables async/await in JS [part 1]
     P.inputs.setBoolean("hideMessage", true);
   });
 
-  TG.onTap(burpeesButton).subscribe(async () =>
-  {
-    if (state.pinLastValue() == STATE.ButtonSelect)
-    {
-      Log("Burpees button pressed!");
-
-      SetState(STATE.WorkingOut);
-
-      lastWorkoutSelected = availableWorkouts[0];
-
-      audioButtonsController.reset();
-      audioButtonsController.setPlaying(true);
-
-      buttonInstructionsText.hidden = R.val(true);
-      
-      SetupWorkoutStart(burpeesAnimationSequence);
-
-      arrowHint.hidden = R.val(true);
-      delete availableWorkouts[0]; // delete the first index (Burpees) in the available workouts array. Note that this lefts the index 0 element in the array but with undefined value
-
-      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
-    }
-    else
-    {
-      Log("ERROR: Button console still not ready!");
-    }
-  });
-
-  TG.onTap(pushupsButton).subscribe(async () =>
-  {
-    if (state.pinLastValue() == STATE.ButtonSelect)
-    {
-      Log("Pushups button pressed!");
-
-      SetState(STATE.WorkingOut);
-
-      lastWorkoutSelected = availableWorkouts[1];
-
-      audioButtonsController.reset();
-      audioButtonsController.setPlaying(true);
-
-      buttonInstructionsText.hidden = R.val(true);
-      
-      SetupWorkoutStart(pushupsAnimationSequence);
-
-      arrowHint.hidden = R.val(true);
-      delete availableWorkouts[1];
-
-      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
-    }
-    else
-    {
-      Log("ERROR: Button console still not ready!");
-    }
-  });
-
-  TG.onTap(situpsButton).subscribe(() =>
-  {
-    if (state.pinLastValue() == STATE.ButtonSelect)
-    {
-      Log("Situps button pressed!");
-      
-      SetState(STATE.WorkingOut);
-
-      lastWorkoutSelected = availableWorkouts[2];
-
-      audioButtonsController.reset();
-      audioButtonsController.setPlaying(true);
-
-      buttonInstructionsText.hidden = R.val(true);
-
-      SetupWorkoutStart(situpsAnimationSequence);
-
-      arrowHint.hidden = R.val(true);
-      delete availableWorkouts[2];
-
-      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
-    }
-    else
-    {
-      Log("ERROR: Button console still not ready!");
-    }
-  });
+  SubscribeWorkoutButtonHandlers();
 
   // this dummmy plane is used to "fake" the bounding box for the main model, as with the original models' BB there were zones for which the tap wasn't working fine
   // TG.onTap(dummyTouchPlane).subscribe(() =>
@@ -471,6 +395,60 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
 }; // Enables async/await in JS [part 2]
 
+function SubscribeWorkoutButtonHandlers()
+{
+  SubscribeWorkoutButtonHandler("Burpees");
+  SubscribeWorkoutButtonHandler("Push-ups");
+  SubscribeWorkoutButtonHandler("Sit-ups");
+}
+
+function SubscribeWorkoutButtonHandler(button)
+{
+  const buttonSubscription = TG.onTap(buttonsMapping[button]).subscribe(() =>
+  {
+    if (state.pinLastValue() == STATE.ButtonSelect)
+    {
+      SetState(STATE.WorkingOut);
+
+      let buttonIndex = GetIndexInMap(buttonsMapping, button);
+      lastWorkoutSelected = availableWorkouts[buttonIndex];
+
+      audioButtonsController.reset();
+      audioButtonsController.setPlaying(true);
+
+      buttonInstructionsText.hidden = R.val(true);
+      arrowHint.hidden = R.val(true);
+
+      SetupWorkoutStart(animationSequencesMapping[buttonIndex]);
+      
+      delete availableWorkouts[buttonIndex]; // delete the button's slot in the available workouts array. Note that this keeps the memory slot in the array but with undefined value
+
+      // SwitchAvailableButtons(false); // uncomment to disable the other not-yet-selected buttons while doing a workout
+
+      buttonSubscription.unsubscribe();
+    }
+    else
+    {
+      Log("ERROR: Button console still not ready!");
+    }
+  });
+}
+
+function GetIndexInMap(array, keyToFind)
+{
+  let keyIndex = -1;
+  for (let i=0; i < Object.keys(array).length; i++)
+  {
+    if (Object.keys(array)[i] == keyToFind)
+    {
+      keyIndex = i;
+      break;
+    }
+  }
+
+  return keyIndex;
+}
+
 function outputToPatch()
 {
   P.inputs.setScalar("state", state);
@@ -549,7 +527,7 @@ async function SetupWorkoutStart(animationSequence)
 
 async function StartWorkout()
 {
-  ShowConfetti(false); // this is required so to stop the confetti animation after a workout (otherwise it won't play next time)
+  ShowConfetti(false); // required so to stop the confetti animation after a workout (otherwise it won't play next time)
   ShowBoard();
 
   currentClipIndex = 0;
@@ -665,11 +643,6 @@ async function OnAnimationFinished()
           Log("Congratulations! All workouts completed");
 
           SetState(STATE.AllWorkoutsCompleted);
-
-          // clip = await A.animationClips.findFirst(clipsMapping["Dance"]);
-          // PlayAnimation(clip, true, true);
-
-          // DEBUG. Cycle through animation sequence
           CycleAnimationSequence();
         }
     }
@@ -729,8 +702,8 @@ function SwitchAvailableButtons(enable)
 
 function SwitchButton(button, enable)
 {
-  if (enable) { buttonCaps[button].material = buttonMat; }
-  else { buttonCaps[button].material = buttonMatDisabled; }
+  if (enable) { buttonsMapping[button].material = buttonMat; }
+  else { buttonsMapping[button].material = buttonMatDisabled; }
 }
 
 // this function takes care of the positioning of the only instance of the arrow asset based on the proper placeholder for the current state
