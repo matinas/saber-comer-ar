@@ -151,7 +151,6 @@ Promise.all(
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt6'),
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt7'),
     Au.getAudioPlaybackController('audioPlaybackControllerGrunt8'),
-    Au.getAudioPlaybackController('audioPlaybackCounterController'),
     S.root.findFirst('counterCanvas'),
     S.root.findFirst('boardWorkoutTxt'),
     S.root.findFirst('boardCounterTxt'),
@@ -220,23 +219,22 @@ async function main(assets) { // Enables async/await in JS [part 1]
   counterTextMat = assets[29];
   counterText = assets[30];
   audioWorkoutControllers = [ assets[31], assets[32], assets[33], assets[34], assets[35], assets[36], assets[37], assets[38] ];
-  audioCounterController = assets[39];
-  counterCanvas = assets[40];
-  boardWorkoutTxt = assets[41];
-  boardCounterTxt = assets[42];
-  whiteboard = assets[43];
-  chalkboard = assets[44];
-  const readyToDoorShift = assets[45];
-  confettiBlock = assets[46];
-  glitter = [ assets[47], assets[48], assets[49] ];
-  endMusicController = assets[50];
-  endMusicSpeaker = assets[51];
-  cheerMessageText = assets[52];
-  cheerMessageTextMat = assets[53];
-  cheerMsgCanvas = assets[54];
-  finalMsgText0 = assets[55];
-  finalMsgText1 = assets[56];
-  finalMsgText2 = assets[57];
+  counterCanvas = assets[39];
+  boardWorkoutTxt = assets[40];
+  boardCounterTxt = assets[41];
+  whiteboard = assets[42];
+  chalkboard = assets[43];
+  const readyToDoorShift = assets[44];
+  confettiBlock = assets[45];
+  glitter = [ assets[46], assets[47], assets[48] ];
+  endMusicController = assets[49];
+  endMusicSpeaker = assets[50];
+  cheerMessageText = assets[51];
+  cheerMessageTextMat = assets[52];
+  cheerMsgCanvas = assets[53];
+  finalMsgText0 = assets[54];
+  finalMsgText1 = assets[55];
+  finalMsgText2 = assets[56];
 
   buttonsMapping = {
     "Burpees" : burpeesButton,
@@ -877,14 +875,13 @@ function PlayEarlyWorkoutCompletedVFXs(delay, isLastWorkout)
   }, delay+0.1);
 }
 
-function PlayTextExpandVFX(canvas, text, strValue, textMat, minScale, maxScale, forwardTimeMilis, fadeoutTimeMilis, delay, audioController = null)
+function PlayTextExpandVFX(canvas, text, strValue, textMat, minScale, maxScale, forwardTimeMilis, fadeoutTimeMilis, delay, isCounter = false)
 {
   function PlayVFX()
   {
-    if (audioController != null)
+    if (isCounter)
     {
-      audioController.reset();
-      audioController.setPlaying(true);
+      P.inputs.setPulse("playCounterSFX", R.once()); // send the play sound signal to the patch editor (workaround for no audio effects in the API)
     }
 
     // move the counter forward
@@ -943,7 +940,7 @@ function PlayCounterVFX()
 {
   var strValue = repCounter.toString();
 
-  PlayTextExpandVFX(counterCanvas, counterText, strValue, counterTextMat, 1, 10, 800, 1000, 0, audioCounterController);
+  PlayTextExpandVFX(counterCanvas, counterText, strValue, counterTextMat, 1, 10, 800, 1000, 0, true);
 }
 
 function PlayCheerMessageVFX()
