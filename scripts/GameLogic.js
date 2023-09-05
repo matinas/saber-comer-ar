@@ -1,3 +1,5 @@
+import { setTimeout } from 'timers';
+
 const S = require('Scene');
 const P = require('Patches'); 
 const R = require('Reactive'); 
@@ -8,7 +10,7 @@ const M = require('Materials');
 const TG = require('TouchGestures');
 export const Diagnostics = require('Diagnostics');
 
-const DEBUG = false;
+const DEBUG = true; // TODO: disable for production build!
 
 const DOOR_OPENING_MAX_ROTATION = -170
 const DOOR_OPENING_DURATION = 1500;
@@ -102,12 +104,18 @@ let counterText, counterTextMat, counterCanvas, cheerMessageTextMat, cheerMsgCan
 let repCounter = 0;
 let boardWorkoutTxt, boardCounterTxt;
 
-let audioWorkoutControllers, audioCounterController, endMusicController, endMusicSpeaker;
+let audioWorkoutControllers, endMusicController, endMusicSpeaker;
 
 let whiteboard, chalkboard;
 let confettiBlock, glitter;
 
 let state;
+
+/////// time measurements (TODO: remove for production build!)
+// let startTime = Date.now();
+// let startTimeMs = T.ms;
+// Log("Starting fetching assets from scene...");
+/////////////////////////////////////////////////
 
 Promise.all(
   [
@@ -185,6 +193,20 @@ function RadToDeg(radians)
 
 async function main(assets) { // Enables async/await in JS [part 1]
 
+  /////// time measurements (TODO: remove for production build!)
+  // let endTime = Date.now();
+  // let endTimeMs = T.ms;
+  
+  // Log(`[Date] Start time: ${startTime}, End time: ${endTime}`);
+  // Log(`[Date] Asset fetching completed in ${endTime - startTime} ms`);
+  // Log(`[Time Module] Start time: ${startTimeMs.pinLastValue()}, End time: ${endTimeMs.pinLastValue()}`);
+  // Log(`[Time Module] Asset fetching completed in ${endTimeMs.pinLastValue() - startTimeMs.pinLastValue()} ms`);
+
+  // startTime = Date.now();
+  // startTimeMs = T.ms;
+  // Log(`Starting asset references assignment...`);
+  /////////////////////////////////////////////////
+
   leftDoor = assets[0];
   leftBottomDoor = assets[1];
   bottomDoor = assets[2];
@@ -244,6 +266,15 @@ async function main(assets) { // Enables async/await in JS [part 1]
   
   Log("All assets loaded");
 
+  /////// time measurements (TODO: remove for production build!)
+  // endTime = Date.now();
+  // endTimeMs = T.ms;
+  // Log(`[Date] Start time: ${startTime}, End time: ${endTime}`);
+  // Log(`[Date] Asset references assignment completed in ${endTime - startTime} ms`);
+  // Log(`[Time Module] Start time: ${startTimeMs.pinLastValue()}, End time: ${endTimeMs.pinLastValue()}`);
+  // Log(`[Time Module] Asset references assignment completed in (ms from start) ${endTimeMs.pinLastValue() - startTimeMs.pinLastValue()} ms`);
+  /////////////////////////////////////////////////
+
   SetState(STATE.NotStarted);
 
   playbackController.looping = R.val(true);
@@ -257,6 +288,8 @@ async function main(assets) { // Enables async/await in JS [part 1]
 
   TG.onTap(mainButton).subscribe(() => 
   {
+    Log(`Time since first frame is ${T.ms.pinLastValue()}`);
+
     if (state.pinLastValue() == STATE.NotStarted)
     {
       SetState(STATE.OpeningDoors);

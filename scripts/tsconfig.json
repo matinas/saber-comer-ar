@@ -10,10 +10,11 @@
     "outDir": "C:/Users/matias.nassi/AppData/Local/Facebook/Spark AR Studio/cache/Scripting/out-dir",
     "paths": {
       "*": [
-        "skylight-typedefs/c71f4abe161fc1c1/*",
+        "skylight-typedefs/6804d7d5a23abafe/*",
         "skylight-node_modules/*"
       ]
     },
+    "target": "es5",
     "typeRoots": [
       "C:/Users/matias.nassi/AppData/Local/Facebook/Spark AR Studio/cache/Scripting/skylight-node_modules/@types"
     ],
